@@ -2,7 +2,8 @@
 
 Every command addresses a hill by name through the global registry, so it works
 from any directory. `hills eval` prints the report as JSON on stdout and a human
-summary on stderr.
+summary on stderr, so redirecting stdout gives you the report and leaves the
+summary on your terminal.
 
 ## Commands
 

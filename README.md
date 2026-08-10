@@ -275,25 +275,31 @@ replay, not by trust in any single machine.
 ## Working with a coding agent
 
 The [agent skill](https://github.com/autolab-hq/hills/blob/main/skills/hills/SKILL.md) ships in this repo, version-locked to
-the CLI, and installs with `npx skills add autolab-hq/hills` or `hills setup`. It
-has two halves, kept deliberately apart.
+the CLI, and installs with `npx skills add autolab-hq/hills` or `hills setup`.
+You do not have to know what a hill is to use it: it triggers on any request to
+improve a number by iterating, and builds the hill as part of the job.
 
-**Authoring.** The agent interviews you briefly in plain ML language, extracts
-and freezes your evaluation logic into the hill, sorts content across the private
-boundary, and writes the README-as-contract, an example submission, and tests. It
-then red-teams its own draft and presents a decision brief: what the hill
-measures, which gaming vectors it closed, and which remain open as your design
-decision. **You** run `hills commit`. The agent that wrote the evaluator does not
-get to freeze it.
+It runs in four phases.
 
-**Climbing.** A fresh subagent starts from `hills describe` and nothing else,
-keeps research directions as git worktrees, and loops: edit, dev-run, `hills
-eval`, decide. Its delegation prompt carries only the hill name and your goal,
-because the authoring context has seen the evaluator's internals and the climbing
-context must not inherit them.
+1. **Confirm the project.** A minute, no more. What is this, and is it what you
+   want to optimize?
+2. **Agree on a plan.** Goal and direction, files in scope, files that are
+   read-only, what is held out, the constraint that makes runs comparable, what
+   would count as cheating, the run command, and when to stop. You confirm or
+   edit it before anything is built.
+3. **Build and freeze the hill.** The plan becomes a hill: read-only files are
+   frozen into it, held-out data moves into `private/`, and the scoring code is
+   copied rather than imported so it cannot drift with your project. The agent
+   red-teams its own draft, then presents a brief listing the gaming vectors it
+   closed and the ones that remain open as your decision. **You** run
+   `hills commit`. The agent that wrote the evaluator does not get to freeze it.
+4. **The experiment loop.** A fresh subagent starts from `hills describe` and
+   nothing else, then loops: edit, commit, dev-run, `hills eval`, decide. It does
+   not stop to ask permission, and it runs until your stopping criteria are met.
 
-Total human surface for the whole journey: one install, one commit, one "proceed"
-with stopping criteria.
+The third phase is the one a self-graded loop skips, and it is the reason the
+numbers at the end mean something. Total human surface: one install, one commit,
+one "proceed" with stopping criteria.
 
 ## Reference
 

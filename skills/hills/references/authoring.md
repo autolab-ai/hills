@@ -1,154 +1,114 @@
-# Authoring a hill
+# Depth for phases 2 and 3: turning a plan into a hill
 
-Goal: turn what the user already measures into an evaluation that stays honest
-when a metric-maximizing agent attacks it.
+Read this when the plan from phase 2 is agreed and you are building the hill.
+The goal is an evaluation that stays honest when a metric-maximizing agent
+attacks it, which in a few hours will be you.
 
-## 1. Interview
+## Asking the right questions in phase 2
 
-Two or three questions, in plain ML language. Every question exists to make the
-hill harder to cheat. Ask them together, with your own proposal for each, so the
-user can answer with "yes" or a correction.
+Every question in the plan exists to make the hill harder to cheat. Three of
+them carry most of the weight, so if the user is impatient, ask these:
 
-- **Metric and direction.** What number decides whether one run beat another,
-  and is lower or higher better? If the user names several, see "when to propose
-  more than one hill" below.
-- **What is held out.** Which split does the climber train on, which does the
-  evaluator score on, and is there a separate test split for the final claim?
-  Confirm the held-out data moves into `private/` and never enters git.
-- **Feedback.** How much should a failed run tell the climber? Full traces and
-  per-case results make climbing productive; anything that reveals hidden test
-  content makes the hill worthless. Propose the most generous setting that
-  leaks nothing.
-- **Confirm the freeze.** The evaluation logic gets copied into the hill and
-  frozen there, so the hill's judgment cannot drift when the user's project
-  changes. Say this out loud; people are often surprised by it.
+- **What is held out, and what may be trained or tuned on?** Confirm the split
+  moves into `private/` and never enters git. If the user says "there is no
+  held-out set", that is the first thing to fix, not a detail to work around.
+- **Who owns the clock, and what is fixed across runs?** If the metric is
+  wall-clock, throughput or cost, the evaluator has to launch the process and
+  enforce the budget. A submission that reports its own elapsed time is not a
+  measurement.
+- **How much should a failed run tell the climber?** Generous feedback makes the
+  loop productive; anything that echoes hidden test content makes the hill
+  worthless. Propose the most generous setting that leaks nothing.
 
-If the metric is wall-clock, also confirm: the evaluator owns the clock, and the
-submitted code runs as a subprocess it kills at the deadline.
+Also confirm out loud that the evaluation logic is being **copied and frozen**
+into the hill rather than imported from the project. People are often surprised
+by this, and it is the thing that stops old scores from silently changing
+meaning when the project moves on.
 
-## 2. Scaffold
+## Filling in the hill
 
-```
-hills new <name>
-```
+**`hill.yaml`** holds only what the tool needs to run the evaluator: the
+watchdog bound, typed params, blob rules, and `exclusive: gpu` when the metric is
+a physical measurement on shared hardware. Semantic limits belong in `eval.py`.
 
-Use `-t circle-packing` or `-t nanogpt-10min` when one of them is close to the
-shape of the task; both are complete working hills to edit rather than blank
-files. `hills new` never asks anything and never edits a file of the user's.
-
-## 3. Fill it in
-
-**`hill.yaml`.** Only what the tool needs to run the evaluator: watchdog,
-typed params, blob rules, and `exclusive: gpu` when the metric is a physical
-measurement on shared hardware. Semantic limits belong in `eval.py`.
-
-**`eval.py`.** One function, `def eval(submission: Path, *, final: bool = False,
-**params) -> dict`. Extract the user's existing evaluation code into it rather
-than importing from their project: a hill that imports the project drifts with
-the project.
-
-Return:
+**`eval.py`** is one function:
 
 ```python
-{
-  "passed": bool,
-  "metrics": [{"name": ..., "value": ..., "direction": "min" | "max"}],
-  "config":  [{"name": ..., "value": ..., "primary": bool}],
-  "details": {...},
-}
+def eval(submission: Path, *, final: bool = False, **params) -> dict:
+    return {
+        "passed": bool,
+        "metrics": [{"name": ..., "value": ..., "direction": "min" | "max"}],
+        "config":  [{"name": ..., "value": ..., "primary": bool}],
+        "details": {...},
+    }
 ```
 
-Metrics rank lexicographically in the order you list them. Primary config
-entries define comparability: two reports rank together only if their primary
-tuples match. Put hardware profile, time budget, and mode in primary. Put
-library versions and diagnostics in non-primary.
+Metrics rank lexicographically in the order you list them, so the primary metric
+goes first and the rest break ties. Primary config entries define comparability:
+two reports rank together only if their primary tuples match. Hardware profile,
+time budget and mode belong in primary; library versions and diagnostics do not.
+
+Compute the metric from raw artifacts. If the evaluator reads a number that the
+submission produced, the whole exercise is decorative.
 
 **The private boundary.** Everything in a hill is climber-readable except
-`private/`. That includes `eval.py`. So any constant that would reveal an answer
-(hidden test shapes, expected outputs, tolerances that give away the test cases)
-goes in `private/`, not inline in the evaluator.
+`private/`, and that includes `eval.py`. So any constant that reveals an answer,
+such as hidden test shapes or expected outputs, lives in `private/` and is read
+from there.
 
 **Defensive authoring rule.** Do not open the user's held-out data beyond
-sniffing enough bytes to confirm the format, and tell the user you did that and
-nothing more. You are about to write the evaluator; you should not be carrying
-around what is in the test set.
+sniffing enough bytes to confirm the format, and tell the user that is what you
+did. You are writing the evaluator; you should not be carrying around what is in
+the test set.
 
-**`README.md`.** This is the contract, and it is the only thing the climbing
-agent will read. Task, submission format (a directory, and what must be in it),
-metric and how it is computed, params, test mode, and a short "what the
-evaluator will not do" section.
+**`README.md` is the contract**, and the only thing the climbing context reads.
+Task, submission format as a directory listing, how the metric is computed,
+params, test mode, and a short "what the evaluator will not do".
 
-**`examples/`.** At least one minimal submission that scores. It is the fastest
-possible answer to "what does a submission look like".
+**`examples/`** needs at least one submission that scores. It answers "what does
+a submission look like" faster than prose.
 
-**`tests/`.** Ordinary pytest files. `from hills import run_evaluator` gives you
-`run_evaluator(hill_path, submission_path, **params) -> dict`, so a test is
-three lines. Write at least: the example submission scores as expected; a broken
-variant fails with a useful message; the primary config is what you think it is.
-Turn any expensive param down in tests so `hills check` stays fast.
+**`tests/`** are ordinary pytest files. `from hills import run_evaluator` gives
+you `run_evaluator(hill_path, submission_path, **params) -> dict`. Write at
+least: the example scores as expected, a broken variant fails with a useful
+message, and the primary config is what you think it is. Turn expensive params
+down so `hills check` stays fast.
 
-## 4. Red-team your own draft
+## The red-team pass
 
-Before showing anything to the user, attack the hill you just wrote. Enumerate
-how an agent optimizing the metric could satisfy its letter while violating its
-intent. At minimum, check all of these:
+Before showing the user anything, attack the hill you just wrote. Take the
+cheating list from phase 2, add the standard vectors, and for each one either
+close it in the evaluator or put it in the brief.
 
 | vector | what it looks like | how to close it |
 |---|---|---|
-| metric computed by the submission | evaluator reads a number the submission wrote | evaluator computes the metric from raw artifacts only |
+| metric computed by the submission | evaluator reads a number the submission wrote | compute it from raw artifacts only |
 | clock not evaluator-owned | submission self-reports elapsed time, or sleeps past a soft limit | evaluator launches the process and kills it at the deadline |
-| held-out leakage through feedback | error messages echo test inputs, counts, or per-case answers | say what failed, not what the answer was |
-| held-out leakage through the tree | test data committed to git "just this once" | it never enters git; `private.lock` binds it by hash |
+| leakage through feedback | error messages echo test inputs, counts, or per-case answers | say what failed, not what the answer was |
+| leakage through the tree | test data committed "just this once" | it never enters git; `private.lock` binds it by hash |
 | stale artifact reuse | evaluator finds a checkpoint from a previous run | fresh working directory per evaluation |
-| degenerate optimum | metric does not constrain size, memory, or precision, so scaling up wins | constrain it, make it primary config, or surface it |
+| degenerate optimum | metric does not constrain size, memory or precision, so scaling up wins | constrain it, make it primary config, or surface it |
 | evaluator drift | evaluator imports the user's project code | freeze a copy inside the hill |
 
-Fix what you can fix in the evaluator. What you cannot fix becomes part of the
-brief.
-
-## 5. Check
-
-```
-hills check <name>
-```
-
-Manifest, evaluator contract, and `tests/`. It must be green before you write
-the brief. `hills commit` runs it again as a gate.
-
-## 6. The decision brief
-
-Present in your message, not in a file:
-
-1. **What this hill measures**, in one paragraph, in the user's own terms.
-2. **Gaming vectors you closed**, and how. One line each.
-3. **Gaming vectors that remain open** because the objective underdetermines
-   them. Present each as the user's decision with concrete options: constrain it
-   in the evaluator, make it a primary config entry so variants rank separately,
-   or accept it and note it in the README. Recommend one.
-4. Also state: what you read of the private data (headers only), and the exact
-   command they should run.
-
-Then stop. **The human runs `hills commit <name> -m "..."` themselves.** Do not
-run it for them, do not offer to run it, and do not treat their "looks good" as
-permission to run it. This is the trust transition of the whole system.
+The last two rows are the ones that most often survive into the brief. That is
+fine, as long as they arrive there labeled.
 
 ## When to propose more than one hill
 
-If the user's goals genuinely decompose into distinct objectives (quality at a
-fixed time budget *and* raw throughput; accuracy *and* memory footprint), do not
-compress them into one metric with weights nobody can defend. Propose specific
-hills, named, with their metrics stated. Two concrete proposals, not an
-open-ended menu.
+If the user's goals genuinely decompose into distinct objectives, such as quality
+at a fixed time budget *and* raw throughput, do not compress them into one metric
+with weights nobody can defend. Propose specific hills, named, with their metrics
+stated. Two concrete proposals, not an open-ended menu.
 
-## After the commit
+## The brief, and the handoff
 
-Ask two things:
+The brief goes in your message, not in a file, and its third section is the one
+that matters: vectors still open because the objective underdetermines them, each
+presented as the user's decision with concrete options and your recommendation.
 
-- Proceed to climbing?
-- Stopping criteria: target metric, time box, number of directions?
-
-On yes, delegate to a fresh-context subagent. The delegation prompt contains
-**only the hill name and the user's goal**. No summary of the authoring work, no
-mention of what is in `private/`, no hints about what you think will work. Your
-context has seen the evaluator's internals; the climbing context must not
-inherit that.
+Then stop. The human runs `hills commit`. After it lands, ask two things: proceed
+to climbing, and what the stopping criteria are. On yes, delegate phase 4 to a
+fresh subagent whose prompt contains only the hill name and the user's goal. No
+summary of your authoring work, no mention of what is in `private/`, no hints
+about what you think will work. Your context has seen the evaluator's internals;
+the climbing context must not inherit that.
