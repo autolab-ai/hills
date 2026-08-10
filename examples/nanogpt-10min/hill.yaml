@@ -1,0 +1,23 @@
+name: nanogpt-10min
+version: 0.1.0
+
+# Last resort only. The semantic limit is time_limit_s below, enforced inside
+# eval.py, which owns the official clock. This bound exists so a hung evaluator
+# cannot wedge an agent loop.
+watchdog_timeout_s: 2400
+
+params:
+  time_limit_s:
+    type: int
+    default: 600
+    min: 20
+    max: 1200
+    help: "wall-clock seconds the submitted train.py is allowed before it is killed"
+
+blobs:
+  threshold: 1MB
+  track: ["data/**"]
+
+# val.bpb is a measurement on one accelerator. Two official runs at once would
+# corrupt both, so evals of this hill serialize on the device.
+exclusive: gpu

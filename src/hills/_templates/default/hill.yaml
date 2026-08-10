@@ -1,0 +1,19 @@
+name: __NAME__
+version: 0.1.0
+
+# Hard kill for a hung evaluator. Not a semantic time limit: if your task has a
+# time budget, enforce it inside eval.py, which owns the official clock.
+watchdog_timeout_s: 600
+
+# Typed knobs the tool validates and passes to eval() as keyword arguments.
+params:
+  tolerance: {type: float, default: 1.0e-6, min: 0.0}
+
+# Large assets stay out of git and are bound into the hill's identity by hash.
+# blobs:
+#   threshold: 10MB
+#   track: ["data/**"]
+
+# Uncomment when the metric is a physical measurement on shared hardware, so
+# concurrent official runs cannot corrupt each other.
+# exclusive: gpu

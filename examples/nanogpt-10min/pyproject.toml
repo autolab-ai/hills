@@ -1,0 +1,12 @@
+[project]
+name = "nanogpt-10min"
+version = "0.1.0"
+description = "Evaluation environment for the nanogpt-10min hill"
+requires-python = ">=3.11"
+dependencies = [
+    "torch>=2.4",
+    "numpy>=1.24",
+]
+
+[dependency-groups]
+dev = ["pytest>=8.0"]
