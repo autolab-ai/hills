@@ -39,4 +39,6 @@ jobs:
           fi
 
       - name: Publish
-        run: uv publish
+        # `always` rather than the default `automatic`: if the OIDC token is
+        # missing, fail here instead of falling through to another auth path.
+        run: uv publish --trusted-publishing always
