@@ -251,3 +251,35 @@ def test_new_from_a_named_example(cli, project):
     assert hill.manifest.name == "my-packing", "the manifest is renamed to the new hill"
     assert (hill.root / "examples" / "grid" / "solution.json").is_file()
     assert 'name = "my-packing"' in (hill.root / "pyproject.toml").read_text()
+
+
+def test_home_directory_is_never_a_project(monkeypatch, tmp_path):
+    """~/.autolab is the machine-state dir, so it must not read as a project marker."""
+    from hills import paths
+    from hills.errors import HillsError
+
+    fake_home = tmp_path / "home"
+    (fake_home / ".autolab" / "hills").mkdir(parents=True)
+    monkeypatch.setenv("HILLS_HOME", str(fake_home / ".autolab" / "hills"))
+    monkeypatch.setattr(Path, "home", lambda: fake_home)
+
+    with pytest.raises(HillsError, match="keeps its own state"):
+        paths.project_hills(fake_home)
+
+    # a plain directory under it still gets its own hills folder
+    nested = fake_home / "work"
+    nested.mkdir()
+    assert paths.project_hills(nested) == nested / ".autolab" / "hills"
+
+
+def test_forget_drops_a_registry_entry_without_touching_the_hill(cli, packing, capsys):
+    assert "circle-packing" in registry.entries()
+    cli("forget", "circle-packing")
+    capsys.readouterr()
+    assert "circle-packing" not in registry.entries()
+    assert packing.is_dir(), "forget must not delete the hill"
+
+
+def test_forget_refuses_an_unknown_name(cli, packing):
+    with pytest.raises(HillsError, match="no hill named nope is registered"):
+        cli("forget", "nope")

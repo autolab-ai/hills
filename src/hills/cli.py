@@ -326,9 +326,28 @@ def cmd_list(args) -> int:
     if not rows:
         out("no hills registered. Create one with: hills new <name>")
         return 0
+    out("hills registered on this machine:")
     for row in rows:
         status = "" if row["present"] else "  (missing)"
-        out(f"{row['name']:<24} {_short(row['tree_hash'], 12):<14} {row['path']}{status}")
+        out(f"  {row['name']:<24} {_short(row['tree_hash'], 12):<14} {row['path']}{status}")
+    gone = [row["name"] for row in rows if not row["present"]]
+    if gone:
+        out("")
+        out(f"{len(gone)} registered path(s) no longer exist. Deleting a hill does not "
+            "unregister it;")
+        out(f"drop the entries with: hills forget {' '.join(gone)}")
+    return 0
+
+
+def cmd_forget(args) -> int:
+    known = registry.entries()
+    for name in args.name:
+        if name not in known:
+            raise HillsError(f"no hill named {name} is registered")
+        registry.forget(name)
+        out(f"forgot {name} ({known[name].get('path')})")
+    out("")
+    out("The hill directory itself was not touched.")
     return 0
 
 
@@ -465,6 +484,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     examples = add("examples", "example hills bundled with the tool, usable with `hills new -t`")
     examples.set_defaults(func=cmd_examples)
+
+    forget = add("forget", "drop hills from the registry; the directories are left alone")
+    forget.add_argument("name", nargs="+")
+    forget.set_defaults(func=cmd_forget)
 
     setup = add("setup", "install the agent skill into detected harnesses")
     setup.add_argument("--harness", help="install for one named harness")

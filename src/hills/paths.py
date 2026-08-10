@@ -4,6 +4,8 @@ import os
 import sys
 from pathlib import Path
 
+from hills.errors import HillsError
+
 PROJECT_DIRNAME = ".autolab"
 PROJECT_HILLS = "hills"
 
@@ -46,14 +48,32 @@ def locks_root() -> Path:
 
 
 def project_root(start: Path) -> Path:
-    """Nearest ancestor holding a .git or an existing .autolab, else `start`."""
+    """Nearest ancestor holding a .git or an existing .autolab, else `start`.
+
+    The machine-state directory is itself named .autolab, so it never counts as
+    a project marker; otherwise every directory under $HOME would resolve to
+    $HOME and hills would be created inside the tool's own state.
+    """
     start = start.resolve()
+    state = home().resolve()
     for candidate in [start, *start.parents]:
-        if (candidate / ".git").exists() or (candidate / PROJECT_DIRNAME).is_dir():
+        if (candidate / ".git").exists():
+            return candidate
+        marker = candidate / PROJECT_DIRNAME
+        if marker.is_dir() and marker.resolve() != state.parent:
             return candidate
     return start
 
 
 def project_hills(start: Path) -> Path:
     """Where hills live inside a project: <project>/.autolab/hills."""
-    return project_root(start) / PROJECT_DIRNAME / PROJECT_HILLS
+    root = project_root(start)
+    hills = root / PROJECT_DIRNAME / PROJECT_HILLS
+    if hills.resolve() == home().resolve():
+        raise HillsError(
+            f"refusing to create a hill in {root}, because {home()} is where hills "
+            "keeps its own state (the registry, the signing key, run logs).\n"
+            "Change to your project directory first, or run `git init` here if this "
+            "is the project."
+        )
+    return hills
