@@ -7,8 +7,8 @@
   <a href="#what-a-hill-is">What a hill is</a> ·
   <a href="#how-it-stays-honest">How it stays honest</a> ·
   <a href="#reference">Reference</a> ·
-  <a href="docs/SPEC.md">Spec</a> ·
-  <a href="skills/hills/SKILL.md">Agent skill</a>
+  <a href="https://github.com/QKayV/hills/blob/main/docs/SPEC.md">Spec</a> ·
+  <a href="https://github.com/QKayV/hills/blob/main/skills/hills/SKILL.md">Agent skill</a>
 </p>
 
 <p align="center">
@@ -276,7 +276,7 @@ replay, not by trust in any single machine.
 
 ## Working with a coding agent
 
-The [agent skill](skills/hills/SKILL.md) ships in this repo, version-locked to
+The [agent skill](https://github.com/QKayV/hills/blob/main/skills/hills/SKILL.md) ships in this repo, version-locked to
 the CLI, and installs with `npx skills add autolab/hills` or `hills setup`. It
 has two halves, kept deliberately apart.
 
@@ -356,4 +356,4 @@ normalized GPU profile as primary config.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](https://github.com/QKayV/hills/blob/main/LICENSE).

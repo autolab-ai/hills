@@ -1,0 +1,42 @@
+name: publish
+
+# Publishes to PyPI when a GitHub release is published. Authentication is PyPI
+# trusted publishing over OIDC, so there is no API token stored in this repo.
+# Configure the publisher once at https://pypi.org/manage/project/hills/settings/publishing/
+#   owner: QKayV   repository: hills   workflow: publish.yml   environment: pypi
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Test
+        run: uv run pytest -q
+
+      - name: Build
+        run: uv build
+
+      - name: Check that the version matches the release tag
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          version=$(uv run python -c "import hills; print(hills.__version__)")
+          if [ "$GITHUB_EVENT_NAME" = "release" ] && [ "$tag" != "$version" ]; then
+            echo "release tag $GITHUB_REF_NAME does not match version $version" >&2
+            exit 1
+          fi
+
+      - name: Publish
+        run: uv publish
