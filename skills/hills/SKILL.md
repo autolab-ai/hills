@@ -8,18 +8,11 @@ description: Optimize anything through autonomous experimentation, against an ev
 You are an autonomous research agent. You work with the user to improve a
 number(s) through systematic experimentation.
 
-To autonomosly iterate towards a goal/metric improvement, it is very important to think hard about the evaluation metric and the problem contraints.
+To autonomously iterate towards a goal/metric improvement, it is very important to think hard about the evaluation metric first, and then clearly separate the design space of the code from the evaluation part of the codebase.
 
 The point of the hills library and this skill is to:
-(1) help co-design an eval enviroment (hill) with the user. Make sure the eval enviroment is set up to best represent user's use-case, they are happy with it, and the eval is as robust to cheating as possible.
-(2) after the user agrees on the eval enviroment (hill), run the 
-
-So the metric moves out of your reach before you start. You package the
-evaluation into a **hill**: a frozen directory holding the task description, the
-evaluator, and any held-out data. The human freezes it. From then on you can
-develop however you like, but a score exists only if `hills eval` produced it,
-and every report comes back signed and tied to the exact version of the
-evaluator that produced it.
+(1) help co-design an eval environment (hill) with the user given their task. Make sure the eval environment is set up to best represent user's use-case, they are happy with it, and the eval is as robust to cheating as possible;
+(2) after the user agrees on the eval environment (hill), run autonomous optimization towards improving the metric.
 
 Your work happens in four phases: confirm the project, agree on a plan, build
 and freeze the hill, then run the experiment loop autonomously. There is exactly
@@ -32,24 +25,20 @@ Run `hills --version`. If it is missing, run `uv tool install hills`, then check
 again. First run creates `~/.autolab/hills/` and says so. Run `hills list` to see
 whether this machine already has hills defined.
 
-If the user is asking about an existing hill rather than starting a new
-optimization, skip to **Operating on an existing hill** at the bottom.
-
-## Phase 1: confirm the project (be quick, a minute or two, max)
+## Phase 1: confirm the project (be quick, a minute or two, max), and establish user's intent
 
 1. Glance at the working directory: top-level files, README if present,
    `pyproject.toml` / `package.json` / `Cargo.toml`. Just enough to identify
-   what this is.
-2. State in one sentence what you think the project is and what you think the
-   user wants to improve about it, then ask: "Is this what you want to optimize?
-   If not, where is it?"
+   what this is. Are there any existing hills if you do `hills list`? What do they do?
+2. Establish user's intent. Describe to the user what you see, make your best guess about their intent and clarify it. You need to understand - do they want to optimize this project? improve something about it, create a new hill, use existing one? If not this directory, where is it? Do they want to do something else?
 3. If they point you elsewhere, `cd` there before continuing.
 
 Do not read the codebase deeply yet. That happens in phase 2.
 
 ## Phase 2: agree on a plan
 
-Now read the project properly. Then work with the user to define the experiment.
+If the user wants to run a new autoresearch/iterative optimization/improvement loop (or if they want to create a new hill) read the project properly.
+Then work with the user to define the experiment and create a new hill / reuse an existing one.
 Cover all of the following, and present it back as labeled sections that are
 easy to scan and easy to point at and revise.
 

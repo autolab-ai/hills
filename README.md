@@ -3,7 +3,7 @@
 <p align="center"><strong>Local verification environments for AI research agents</strong></p>
 
 <p align="center">
-  <a href="#quickstart">Quickstart</a> ·
+  <a href="#quickstart-for-humans">Quickstart</a> ·
   <a href="#what-a-hill-is">What a hill is</a> ·
   <a href="#how-it-stays-honest">How it stays honest</a> ·
   <a href="#reference">Reference</a> ·
@@ -35,7 +35,29 @@ report. The agent can query the verifier; it cannot modify it or grade itself.
 The mental model is git. A hill is a versioned directory, `hills commit` freezes
 it, and every score is tied to the exact version that produced it.
 
-## Quickstart
+## Quickstart, for humans
+
+Install the skill. It bootstraps the CLI itself on first use, so this is the
+only command you run.
+
+```bash
+npx skills add autolab-ai/hills
+```
+
+Then tell your coding agent what you want, in your own words:
+
+> Please help me create an optimization environment and improve on it using hills
+
+It will look at your project, agree a plan with you (what number to move, what
+it may edit, what stays read-only, what is held out, what would count as
+cheating), build the evaluation and hand it back for review. You run one command
+by hand, `hills commit`, which freezes it. Then it climbs, autonomously, until
+your stopping criteria are met.
+
+That one command is deliberate. The agent that wrote the evaluator does not get
+to freeze it.
+
+## Quickstart, for agents
 
 Two minutes, no GPU, no network after install. We will create the hello-world
 hill, freeze it, score a submission against it, and then show what happens when
@@ -45,13 +67,6 @@ someone edits the score.
 
 ```bash
 uv tool install hills
-```
-
-If you want your coding agent to drive this instead, install the skill and it
-bootstraps the CLI itself:
-
-```bash
-npx skills add autolab-ai/hills
 ```
 
 **2. Create a hill.** `circle-packing` ships with the tool: place 26 circles in
