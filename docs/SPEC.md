@@ -154,7 +154,7 @@ Machine state lives under `~/.autolab/hills/`:
 
 The repository is a monorepo: the Python library + CLI, this spec, example hills, and an **agent skill** — instructions that let coding agents (Claude Code and similar) create and climb hills conversationally. The skill is a first-class deliverable, version-locked to the CLI in the same repo.
 
-Primary installation path is the skill itself: `npx skills add autolab/hills` installs the skill into the user's agent harness; the skill then bootstraps the CLI on first use (`hills --version`; if missing, `uv tool install hills`). The reverse door also exists: `uv tool install hills && hills setup`, where `setup` detects installed harnesses and installs the skill files.
+Primary installation path is the skill itself: `npx skills add autolab-hq/hills` installs the skill into the user's agent harness; the skill then bootstraps the CLI on first use (`hills --version`; if missing, `uv tool install hills`). The reverse door also exists: `uv tool install hills && hills setup`, where `setup` detects installed harnesses and installs the skill files.
 
 The skill has a router and two halves:
 
@@ -185,7 +185,7 @@ This tool defends against *self-deception*: an agent loop accidentally or opport
 
 Starting state: a user has `my-llm/` containing `train.py` (training and evaluation in one file) and `data/{train,val,test}.bin`. They want their coding agent to improve val loss without grading its own work.
 
-1. **Install (the only setup command):** `npx skills add autolab/hills`.
+1. **Install (the only setup command):** `npx skills add autolab-hq/hills`.
 2. **Invoke.** The user tells their agent: "Make a hill out of this repo — val bpb after a 10-minute training run, test set hidden — then climb it." The agent checks `hills --version`, installs the CLI via uv if missing (first run lazily creates `~/.autolab/hills/` with a one-line notice), orients, and confirms the plan.
 3. **Interview.** Two or three questions: how much feedback should failed runs expose? confirm test stays hidden and the clock is evaluator-owned; confirm the eval logic will be frozen into the hill.
 4. **Scaffold and fill.** `hills new nanogpt-10min` creates `.hills/nanogpt-10min/` with `.vc` and the self-ignoring `.hills/.gitignore`. The agent writes `hill.yaml` (watchdog, `params: time_limit_s`, `blobs.track: ["data/**"]`), `README.md` (submission contract: a directory with `train.py`, invoked as `python train.py --data <hill>/data/train.bin --out <workdir>/checkpoints/`; checkpoint expected at `checkpoints/final.pt`), and `eval.py` (launches the submitted `train.py`, kills at `time_limit_s`, runs the frozen bpb evaluation from the user's original code against `private/data/val.bin` — or `test.bin` in final mode — and detects the GPU, reporting a normalized profile as primary config). It moves val/test into `private/data/`, leaves training data at `data/`, writes a minimal `examples/` submission and `tests/` asserting the evaluator accepts it and rejects a broken variant. It notes: "I read only the header bytes of val/test to confirm format."

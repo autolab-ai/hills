@@ -1,6 +1,6 @@
 """`hills setup`: install the agent skill into whichever harnesses are present.
 
-The primary install path is the other direction (`npx skills add autolab/hills`,
+The primary install path is the other direction (`npx skills add autolab-hq/hills`,
 which then bootstraps the CLI). This is the reverse door for people who
 installed the CLI first.
 """

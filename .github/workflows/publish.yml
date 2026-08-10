@@ -3,7 +3,7 @@ name: publish
 # Publishes to PyPI when a GitHub release is published. Authentication is PyPI
 # trusted publishing over OIDC, so there is no API token stored in this repo.
 # Configure the publisher once at https://pypi.org/manage/project/hills/settings/publishing/
-#   owner: QKayV   repository: hills   workflow: publish.yml   environment: pypi
+#   owner: autolab-hq   repository: hills   workflow: publish.yml   environment: pypi
 
 on:
   release:
