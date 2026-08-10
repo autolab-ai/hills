@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "hills"
 version = "0.1.1"
-description = "Local verification environments for AI research agents"
+description = "Run agent optimization loops against an evaluator the agent cannot change"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"

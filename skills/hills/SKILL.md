@@ -90,8 +90,8 @@ Each section lands somewhere concrete, so the plan is already the build order:
    do not import it from the project, or the hill drifts and old scores stop
    meaning anything.
 3. **Sort across the private boundary.** Held-out splits, hidden cases, reference
-   solutions and answer-revealing constants go under `private/`. Everything else
-   is climber-readable including `eval.py`: knowing how you are judged is fine,
+   solutions and answer-revealing constants go under `private/`. The agent may
+   read everything else including `eval.py`: knowing how you are scored is fine,
    knowing the answers is not.
 4. **Write `README.md` as the contract.** The only thing the climbing context
    reads: task, submission format, how the metric is computed, params, and a
@@ -208,11 +208,11 @@ about how well things are going.
 - Never edit a hill while climbing it. If the evaluator looks wrong, stop and say
   why; a changed hill has a different tree hash, so your score stops being
   comparable to anything before it.
-- Never read `private/` while climbing. "Just checking the format" is not a
-  version of this that is acceptable.
+- Never read `private/` while climbing, including to check a file format.
 - Never re-implement the metric in your submission and report its output.
 - `--final` is for the final claim. Running it repeatedly and keeping the best
-  turns the test split into a validation split and destroys the hill.
+  turns the test split into a validation split, and the hill stops measuring
+  what it was built to measure.
 - A way to score well without doing the task is a finding to report, not a result
   to submit.
 - Report a lack of progress honestly.

@@ -1,8 +1,8 @@
-# Depth for phases 2 and 3: turning a plan into a hill
+# Building the hill (phases 2 and 3)
 
-Read this when the plan from phase 2 is agreed and you are building the hill.
-The goal is an evaluation that stays honest when a metric-maximizing agent
-attacks it, which in a few hours will be you.
+Read this once the phase 2 plan is agreed. The goal is an evaluation that still
+measures what it claims to when an agent optimizing the metric goes looking for
+shortcuts, which in a few hours is what you will be doing.
 
 ## Asking the right questions in phase 2
 
@@ -16,7 +16,7 @@ them carry most of the weight, so if the user is impatient, ask these:
   wall-clock, throughput or cost, the evaluator has to launch the process and
   enforce the budget. A submission that reports its own elapsed time is not a
   measurement.
-- **How much should a failed run tell the climber?** Generous feedback makes the
+- **How much should a failed run tell the agent?** Generous feedback makes the
   loop productive; anything that echoes hidden test content makes the hill
   worthless. Propose the most generous setting that leaks nothing.
 
@@ -48,10 +48,10 @@ goes first and the rest break ties. Primary config entries define comparability:
 two reports rank together only if their primary tuples match. Hardware profile,
 time budget and mode belong in primary; library versions and diagnostics do not.
 
-Compute the metric from raw artifacts. If the evaluator reads a number that the
-submission produced, the whole exercise is decorative.
+Compute the metric from raw artifacts. If the evaluator reads a number the
+submission produced, it is reporting the submission's claim, not measuring it.
 
-**The private boundary.** Everything in a hill is climber-readable except
+**The private boundary.** The agent may read everything in a hill except
 `private/`, and that includes `eval.py`. So any constant that reveals an answer,
 such as hidden test shapes or expected outputs, lives in `private/` and is read
 from there.

@@ -389,7 +389,7 @@ def cmd_home(args) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="hills",
-        description="Verification environments for AI research agents.",
+        description="Run an optimization loop against an evaluator the agent cannot change.",
     )
     parser.add_argument("--version", action="version", version=f"hills {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)

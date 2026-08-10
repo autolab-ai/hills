@@ -1,4 +1,4 @@
-# Depth for phase 4: the experiment loop
+# The experiment loop (phase 4)
 
 You have a hill name and a goal. That is everything you are supposed to have.
 
@@ -17,7 +17,8 @@ writing code, then look at `examples/` in the hill directory: those are working
 submissions and they answer format questions faster than reasoning does.
 
 You may read anything in the hill except `private/`. `eval.py` is meant to be
-read. Reading how you are judged is encouraged. Reading the held-out data is not.
+read, so understanding how you are scored is encouraged; reading the held-out
+data is not.
 
 ## Branches
 
@@ -29,9 +30,9 @@ hills/<name>: <short description of the change>
 
 **Do not `reset --hard` a discarded experiment away.** Each report records
 `submission_git` as `branch@short-sha`. Discarding the commit leaves a signed
-score pointing at a sha nobody can check out, which is exactly the property the
-tool exists to provide. Keep history linear and complete; when an experiment is
-worse, the next commit reverts the in-scope files as part of its own change.
+score pointing at a sha nobody can check out, so the score can no longer be
+reproduced. Keep history linear and complete; when an experiment is worse, the
+next commit reverts the in-scope files as part of its own change.
 
 Commit before every eval. Uncommitted work comes back labeled `+dirty` and two
 attempts become indistinguishable in the log afterwards.
