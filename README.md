@@ -1,10 +1,6 @@
-<p align="center">
-  <img src="https://raw.githubusercontent.com/QKayV/hills/main/docs/banner.png"
-       alt="hills: agents can climb, evaluators can judge"
-       width="900">
-</p>
+<h1 align="center">hills</h1>
 
-<h3 align="center">Local verification environments for AI research agents</h3>
+<p align="center"><strong>Local verification environments for AI research agents</strong></p>
 
 <p align="center">
   <a href="#quickstart">Quickstart</a> ·
@@ -25,6 +21,12 @@
 > When an agent runs research experiments autonomously, the same model writes the
 > solution, evaluates it, and reports the result. It grades its own homework, so
 > its numbers cannot be trusted. **Hills separates the two roles.**
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/QKayV/hills/main/docs/banner.png"
+       alt="hills: agents can climb, evaluators can judge"
+       width="900">
+</p>
 
 A **hill** is a packaged evaluation task: a task description, an evaluator, and
 data. The agent (the **climber**) develops however it likes, but an official
