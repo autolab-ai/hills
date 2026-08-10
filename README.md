@@ -3,7 +3,7 @@
 <p align="center"><strong>Let an agent run your optimization loop, without letting it grade its own work</strong></p>
 
 <p align="center">
-  <a href="#quickstart-for-humans">Quickstart</a> ·
+  <a href="#quickstart">Quickstart</a> ·
   <a href="#what-a-hill-is">What a hill is</a> ·
   <a href="#how-it-stays-honest">How it stays honest</a> ·
   <a href="#reference">Reference</a> ·
@@ -37,7 +37,9 @@ A hill is a versioned folder: `hills commit` freezes it, and every score is
 pinned to the version that produced it. Change the evaluator and you get a new
 version with a fresh history, because a changed evaluator is a different game.
 
-## Quickstart, for humans
+<a id="quickstart"></a>
+
+## 🧑‍💻 Quickstart
 
 Install the skill. It bootstraps the CLI itself on first use, so this is the
 only command you run.
@@ -59,7 +61,7 @@ your stopping criteria are met.
 That one command is deliberate. The agent that wrote the evaluator does not get
 to freeze it.
 
-## Quickstart, for agents
+## 🤖 Quickstart
 
 Two minutes, no GPU, no network after install. We will create the hello-world
 hill, freeze it, score a submission against it, and then show what happens when
