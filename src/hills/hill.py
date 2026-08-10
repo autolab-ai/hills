@@ -3,8 +3,8 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-from hills import locks, manifest as manifest_mod, registry
-from hills.errors import HillsError
+from hills import locks, manifest as manifest_mod, paths
+from hills.errors import HillNotFound, HillsError
 from hills.vc import VC
 
 EVAL_ENTRYPOINT = "eval.py"
@@ -33,7 +33,20 @@ class Hill:
 
     @classmethod
     def resolve(cls, name: str) -> "Hill":
-        return cls.at(registry.resolve(name))
+        """A name is looked up in .autolab/hills above the cwd; a path is used as given."""
+        given = Path(name)
+        if (given / MANIFEST_NAME).is_file():
+            return cls.at(given)
+
+        found = paths.find_hill(name, Path.cwd())
+        if found is not None:
+            return cls.at(found)
+
+        nearby = [d.name for d in paths.nearby_hills(Path.cwd())]
+        known = ", ".join(nearby) if nearby else "(none in this project)"
+        raise HillNotFound(
+            f"no hill named {name} in .autolab/hills above {Path.cwd()}. Here: {known}"
+        )
 
     # -- paths ------------------------------------------------------------
 

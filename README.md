@@ -338,7 +338,7 @@ one "proceed" with stopping criteria.
 | `hills eval <dir> -H <name>` | score a submission directory |
 | `hills attempts <name>` | eval history for this version; flags a broken chain |
 | `hills verify <report.json>` | check a report's signature |
-| `hills list` | registered hills |
+| `hills list` | the hills in this project |
 | `hills setup` | install the agent skill into detected harnesses |
 | `hills home` | where machine state lives |
 
@@ -355,7 +355,6 @@ logged separately).
 
 ```
 ~/.autolab/hills/
-  registry.json                       name -> path, current tree hash
   key                                 the per-machine signing key (0600)
   state/<name>@<tree_hash>/attempts.jsonl   append-only, HMAC-chained
   runs/<name>/<timestamp>-<id>/       materialized hill, submission snapshot, logs, report

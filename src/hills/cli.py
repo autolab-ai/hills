@@ -9,7 +9,6 @@ from hills import (
     check as check_mod,
     locks,
     paths,
-    registry,
     report as report_mod,
     runner,
     scaffold,
@@ -150,7 +149,6 @@ def cmd_commit(args) -> int:
     hill.refresh_exclude()
     excluded = [locks.PRIVATE_DIR, *blobs_lock.paths]
     tree_hash = hill.vc.commit(args.message, excluded)
-    registry.set_tree_hash(hill.name, tree_hash)
 
     out("")
     out(f"  private.lock  {len(private_lock.entries)} file(s), {private_lock.total_size:,} bytes")
@@ -308,46 +306,29 @@ def cmd_verify(args) -> int:
 
 
 def cmd_list(args) -> int:
-    entries = registry.entries()
+    found = paths.nearby_hills(Path.cwd())
     rows = []
-    for name, entry in sorted(entries.items()):
-        root = Path(entry["path"]) if entry.get("path") else None
+    for root in found:
+        hill = Hill.at(root)
         rows.append(
             {
-                "name": name,
-                "path": str(root) if root else None,
-                "tree_hash": entry.get("tree_hash"),
-                "present": bool(root and root.is_dir()),
+                "name": hill.name,
+                "path": str(root),
+                "tree_hash": hill.vc.tree_hash() if hill.vc.has_commits else None,
+                "committed": hill.vc.has_commits,
             }
         )
     if args.json:
         print(dumps(rows))
         return 0
     if not rows:
-        out("no hills registered. Create one with: hills new <name>")
+        out(f"no hills under {Path.cwd()} or above it.")
+        out("Create one with: hills new <name>")
         return 0
-    out("hills registered on this machine:")
+    out(f"hills in {found[0].parent}:")
     for row in rows:
-        status = "" if row["present"] else "  (missing)"
-        out(f"  {row['name']:<24} {_short(row['tree_hash'], 12):<14} {row['path']}{status}")
-    gone = [row["name"] for row in rows if not row["present"]]
-    if gone:
-        out("")
-        out(f"{len(gone)} registered path(s) no longer exist. Deleting a hill does not "
-            "unregister it;")
-        out(f"drop the entries with: hills forget {' '.join(gone)}")
-    return 0
-
-
-def cmd_forget(args) -> int:
-    known = registry.entries()
-    for name in args.name:
-        if name not in known:
-            raise HillsError(f"no hill named {name} is registered")
-        registry.forget(name)
-        out(f"forgot {name} ({known[name].get('path')})")
-    out("")
-    out("The hill directory itself was not touched.")
+        state = _short(row["tree_hash"], 12) if row["committed"] else "uncommitted"
+        out(f"  {row['name']:<24} {state}")
     return 0
 
 
@@ -394,7 +375,6 @@ def cmd_setup(args) -> int:
 def cmd_home(args) -> int:
     root = paths.home()
     out(f"{root}")
-    out(f"  registry   {paths.registry_path()}")
     out(f"  key        {paths.key_path()} ({'present' if report_mod.key_exists() else 'not created yet'})")
     out(f"  state      {paths.state_root()}")
     out(f"  runs       {paths.runs_root()}")
@@ -484,15 +464,6 @@ def build_parser() -> argparse.ArgumentParser:
 
     examples = add("examples", "example hills bundled with the tool, usable with `hills new -t`")
     examples.set_defaults(func=cmd_examples)
-
-    forget = add("forget", "drop hills from the registry; the directories are left alone")
-    forget.add_argument("name", nargs="+")
-    forget.set_defaults(func=cmd_forget)
-
-    setup = add("setup", "install the agent skill into detected harnesses")
-    setup.add_argument("--harness", help="install for one named harness")
-    setup.add_argument("--list", action="store_true", help="show harnesses and where the skill goes")
-    setup.set_defaults(func=cmd_setup)
 
     home = add("home", "where machine state lives")
     home.set_defaults(func=cmd_home)

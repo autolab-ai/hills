@@ -1,9 +1,9 @@
-"""`hills new`: create a hill from a template, init .vc, register it. No questions asked."""
+"""`hills new`: create a hill from a template and init its version control. No questions asked."""
 
 import re
 from pathlib import Path
 
-from hills import paths, registry
+from hills import paths
 from hills.errors import HillsError
 from hills.hill import Hill
 from hills.vc import VC
@@ -131,5 +131,4 @@ def new(name: str, *, template: str = DEFAULT_TEMPLATE, where: Path | None = Non
     VC(root).init()
     hill = Hill.at(root)
     hill.refresh_exclude()
-    registry.register(name, root)
     return hill

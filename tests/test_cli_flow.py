@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from hills import registry, state
+from hills import paths, state
 from hills.errors import DirtyHill, HillsError, HillNotFound
 from hills.hill import Hill
 
@@ -43,10 +43,10 @@ def test_new_hill_is_self_ignoring(project, packing):
     ).stdout.strip() == ""
 
 
-def test_new_hill_is_registered_and_versioned(packing):
+def test_new_hill_is_versioned_and_found_by_name(packing):
     assert (packing / ".vc").is_dir()
     assert not (packing / ".git").exists()
-    assert registry.resolve("circle-packing") == packing
+    assert Hill.resolve("circle-packing").root == packing
 
 
 def test_new_refuses_to_overwrite(cli, packing):
@@ -55,8 +55,28 @@ def test_new_refuses_to_overwrite(cli, packing):
 
 
 def test_unknown_hill_names_the_alternatives(packing):
-    with pytest.raises(HillNotFound, match="Registered hills: circle-packing"):
+    with pytest.raises(HillNotFound, match="Here: circle-packing"):
         Hill.resolve("nope")
+
+
+def test_a_hill_is_found_from_a_nested_subdirectory(packing, project, monkeypatch):
+    nested = project / "a" / "b" / "c"
+    nested.mkdir(parents=True)
+    monkeypatch.chdir(nested)
+    assert Hill.resolve("circle-packing").root == packing
+
+
+def test_a_hill_can_be_given_by_path(packing, tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    assert Hill.resolve(str(packing)).root == packing
+
+
+def test_deleting_a_hill_makes_it_gone(packing, cli, capsys):
+    import shutil
+
+    shutil.rmtree(packing)
+    cli("list", "--json")
+    assert json.loads(capsys.readouterr().out) == []
 
 
 # -- check and commit --------------------------------------------------------
@@ -80,8 +100,7 @@ def test_commit_gate_refuses_a_broken_evaluator(cli, packing):
 
 def test_commit_records_the_tree_hash(cli, packing):
     assert cli("commit", "circle-packing", "-m", "initial") == 0
-    hill = Hill.resolve("circle-packing")
-    assert registry.entries()["circle-packing"]["tree_hash"] == hill.vc.tree_hash()
+    assert Hill.resolve("circle-packing").vc.tree_hash()
     assert (packing / "private.lock").is_file()
     assert (packing / "blobs.lock").is_file()
 
@@ -230,11 +249,11 @@ def test_verify_command_exit_codes(cli, committed, submission, tmp_path, capsys)
     assert cli("verify", str(out)) == 1
 
 
-def test_list_shows_the_registry(cli, committed, capsys):
+def test_list_shows_the_project_hills(cli, committed, capsys):
     cli("list", "--json")
     rows = json.loads(capsys.readouterr().out)
     assert rows[0]["name"] == "circle-packing"
-    assert rows[0]["present"] is True
+    assert rows[0]["committed"] is True
 
 
 def test_examples_are_listed_with_summaries(cli, capsys):
@@ -270,16 +289,3 @@ def test_home_directory_is_never_a_project(monkeypatch, tmp_path):
     nested = fake_home / "work"
     nested.mkdir()
     assert paths.project_hills(nested) == nested / ".autolab" / "hills"
-
-
-def test_forget_drops_a_registry_entry_without_touching_the_hill(cli, packing, capsys):
-    assert "circle-packing" in registry.entries()
-    cli("forget", "circle-packing")
-    capsys.readouterr()
-    assert "circle-packing" not in registry.entries()
-    assert packing.is_dir(), "forget must not delete the hill"
-
-
-def test_forget_refuses_an_unknown_name(cli, packing):
-    with pytest.raises(HillsError, match="no hill named nope is registered"):
-        cli("forget", "nope")

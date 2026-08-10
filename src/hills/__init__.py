@@ -3,5 +3,5 @@
 from hills.core_schema import validate_core
 from hills.sdk import load_evaluator, run_evaluator
 
-__version__ = "0.1.2"
+__version__ = "0.1.3"
 __all__ = ["__version__", "load_evaluator", "run_evaluator", "validate_core"]

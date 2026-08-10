@@ -1,9 +1,13 @@
 # CLI reference and troubleshooting
 
-Every command addresses a hill by name through the global registry, so it works
-from any directory. `hills eval` prints the report as JSON on stdout and a human
-summary on stderr, so redirecting stdout gives you the report and leaves the
-summary on your terminal.
+A hill is addressed by name, resolved by walking up from the current directory
+for `.autolab/hills/<name>`, the way git finds `.git`. A path works too, for a
+hill in another project. There is no global index: deleting the directory deletes
+the hill.
+
+`hills eval` prints the report as JSON on stdout and a human summary on stderr,
+so redirecting stdout gives you the report and leaves the summary on your
+terminal.
 
 ## Commands
 
@@ -18,7 +22,7 @@ summary on your terminal.
 | `hills eval <dir> -H <name>` | score a submission directory |
 | `hills attempts <name>` | eval history for the current version |
 | `hills verify <report.json>` | check a report's signature |
-| `hills list` | registered hills |
+| `hills list` | the hills in this project |
 | `hills setup` | install this skill into detected harnesses |
 | `hills examples` | the example hills bundled with the tool |
 | `hills home` | where machine state lives |
@@ -66,7 +70,6 @@ which is expected. Re-run the evaluation instead of arguing about the file.
 
 ```
 .autolab/hills/<name>/                      the hill, inside the user's project
-~/.autolab/hills/registry.json              name -> path, current tree hash
 ~/.autolab/hills/key                        per-machine signing key, mode 0600
 ~/.autolab/hills/state/<name>@<tree>/attempts.jsonl
 ~/.autolab/hills/runs/<name>/<stamp>-<id>/  materialized hill, submission snapshot, logs, report

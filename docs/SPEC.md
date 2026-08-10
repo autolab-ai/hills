@@ -134,7 +134,7 @@ hills setup                    install the agent skill into detected harnesses
 ```
 
 `hills eval` semantics, precisely:
-1. Resolve the hill by name via the registry (`~/.autolab/hills/registry.json`: name → absolute path). Works from any directory.
+1. Resolve the hill by name by walking up from the current directory for `.autolab/hills/<name>`, the way git finds `.git`. A path may be given instead, for a hill in another project.
 2. **Evaluate HEAD, never the working tree.** Materialize the hill from `.vc` HEAD via `git archive` into a temp dir; verify `private/` files and lock-tracked blobs on disk against the locks at HEAD (mismatch → hard error naming the file).
 3. If the hill's working tree is dirty → **error**: "hill has uncommitted changes; commit them, or use --force to evaluate the last committed version." `--force` proceeds against HEAD with a warning. `--current` evaluates the working tree instead — for authors testing evaluator changes against a real submission before committing; its report carries `tree_hash: null` and `official: false` with reason `dirty-tree`, and is logged flagged as dirty.
 4. `--final` requests test mode: by convention the evaluator scores against its held-out test split (e.g. `private/data/test.bin`) instead of the validation split. The mode is passed to the evaluator; the report's config records it.
@@ -142,7 +142,6 @@ hills setup                    install the agent skill into detected harnesses
 6. Concurrency: evals of different submissions may run in parallel. For hills whose metric is a physical measurement on shared hardware (e.g. wall-clock training on a GPU), concurrent official runs corrupt the measurement, so the tool takes a per-device lock during such an eval; a second eval on the same device fails fast with a clear message, or waits if `--queue` is passed. Appends to the attempts log are mutex-protected.
 
 Machine state lives under `~/.autolab/hills/`:
-- `registry.json` — name → path, current tree hash; maintained by `new` and `commit`.
 - `key` — the per-machine signing key.
 - `state/<name>@<tree_hash>/attempts.jsonl` — append-only eval history, each entry HMAC-chained to the previous so gaps or edits are detectable. `hills attempts` reads it and flags a broken chain rather than hiding it. State is keyed by tree hash: a new hill version starts a fresh history, because a changed evaluator is a new game.
 
@@ -212,4 +211,5 @@ Decisions this implementation made where the specification left room:
 - **Lock-tracked paths are excluded from git through `.vc/info/exclude`**, regenerated on every version-control operation, so `git status` and `git add` agree with the manifest without any file appearing in the hill's working tree.
 - **Evaluator failures are recorded as attempts** with an `error` field and no signature, so a watchdog kill or a crash appears in `hills attempts` instead of vanishing.
 - **`--current` runs are logged under `state/<name>@current/`**, separate from official history.
-- **Two extra commands** beyond the specified list: `hills list` (used by the skill's router, referenced in §8) and `hills home` (prints where machine state lives).
+- **No global registry.** The specification called for `~/.autolab/hills/registry.json` mapping name to path. In practice it only rotted: deleting a hill left an entry behind, and nothing rebuilt it. Hills are found by walking up from the current directory for `.autolab/hills/<name>`, so there is no state to go stale, and `hills list` shows the hills of the current project rather than the machine.
+- **Three extra commands** beyond the specified list: `hills list`, `hills examples` (the bundled example hills) and `hills home` (where machine state lives).

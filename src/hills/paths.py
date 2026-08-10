@@ -23,10 +23,6 @@ def ensure_home() -> Path:
     return root
 
 
-def registry_path() -> Path:
-    return home() / "registry.json"
-
-
 def key_path() -> Path:
     return home() / "key"
 
@@ -72,8 +68,35 @@ def project_hills(start: Path) -> Path:
     if hills.resolve() == home().resolve():
         raise HillsError(
             f"refusing to create a hill in {root}, because {home()} is where hills "
-            "keeps its own state (the registry, the signing key, run logs).\n"
+            "keeps its own state (the signing key, attempt logs, run output).\n"
             "Change to your project directory first, or run `git init` here if this "
             "is the project."
         )
     return hills
+
+
+def _project_markers(start: Path):
+    """Every .autolab/ above `start`, skipping the machine-state one."""
+    state = home().resolve()
+    for candidate in [start.resolve(), *start.resolve().parents]:
+        marker = candidate / PROJECT_DIRNAME
+        if marker.is_dir() and marker.resolve() != state.parent:
+            yield marker / PROJECT_HILLS
+
+
+def find_hill(name: str, start: Path) -> Path | None:
+    """Walk up from `start` for .autolab/hills/<name>, the way git finds .git."""
+    for hills in _project_markers(start):
+        candidate = hills / name
+        if candidate.is_dir():
+            return candidate
+    return None
+
+
+def nearby_hills(start: Path) -> list[Path]:
+    """Every hill in the nearest project that has any."""
+    for hills in _project_markers(start):
+        found = sorted(d for d in hills.iterdir() if (d / "hill.yaml").is_file())
+        if found:
+            return found
+    return []

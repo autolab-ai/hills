@@ -21,8 +21,8 @@ permission again.
 ## Phase 0: make sure the CLI is there
 
 `hills --version`; if missing, `uv tool install hills` and check again. First run
-creates `~/.autolab/hills/` and says so. `hills list` shows what this machine
-already has.
+creates `~/.autolab/hills/` and says so. `hills list` shows the hills in this
+project, found by walking up for `.autolab/hills/`.
 
 ## Phase 1: confirm the project (be quick, a minute or two, max), and establish user's intent
 
@@ -179,7 +179,7 @@ not beat the baseline, say so plainly; a hill you did not climb is a result.
 
 | the user wants | do this |
 |---|---|
-| see what hills exist | `hills list` |
+| see what hills exist here | `hills list` |
 | understand a hill's contract | `hills describe <name>` |
 | score something once | `hills eval <dir> -H <name>` |
 | see what has been tried | `hills attempts <name>` |
