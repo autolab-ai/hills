@@ -332,6 +332,20 @@ def cmd_list(args) -> int:
     return 0
 
 
+def cmd_examples(args) -> int:
+    summaries = scaffold.template_summaries()
+    if args.json:
+        print(dumps([{"name": name, "summary": summary} for name, summary in summaries]))
+        return 0
+    out("Example hills bundled with the tool. Start from one with:")
+    out("  hills new <your-name> -t <example>")
+    out("")
+    for name, summary in summaries:
+        out(f"  {name}")
+        out(f"      {summary}")
+    return 0
+
+
 def cmd_setup(args) -> int:
     available = setup_cmd.harnesses()
     if args.list:
@@ -392,7 +406,9 @@ def build_parser() -> argparse.ArgumentParser:
         "--template",
         default=scaffold.DEFAULT_TEMPLATE,
         choices=scaffold.available_templates(),
-        help="start from a shipped example instead of a blank hill",
+        metavar="EXAMPLE",
+        help="start from an example bundled with the tool, by name; "
+        "run `hills examples` to see them (default: %(default)s)",
     )
     new.set_defaults(func=cmd_new)
 
@@ -446,6 +462,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     listing = add("list", "registered hills")
     listing.set_defaults(func=cmd_list)
+
+    examples = add("examples", "example hills bundled with the tool, usable with `hills new -t`")
+    examples.set_defaults(func=cmd_examples)
 
     setup = add("setup", "install the agent skill into detected harnesses")
     setup.add_argument("--harness", help="install for one named harness")

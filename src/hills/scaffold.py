@@ -49,6 +49,30 @@ def available_templates() -> list[str]:
     return sorted(template_paths())
 
 
+def _summary(readme: Path, width: int = 96) -> str:
+    """The template README's first paragraph, as one line."""
+    paragraph: list[str] = []
+    for line in readme.read_text().splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith(("#", "<!--", "-->")):
+            if paragraph:
+                break
+            continue
+        paragraph.append(stripped)
+    text = " ".join(paragraph)
+    if len(text) <= width:
+        return text
+    return text[:width].rsplit(" ", 1)[0] + "…"
+
+
+def template_summaries() -> list[tuple[str, str]]:
+    """(name, one-line summary) for every example bundled with the tool."""
+    return [
+        (name, _summary(root / "README.md") if (root / "README.md").is_file() else "")
+        for name, root in sorted(template_paths().items())
+    ]
+
+
 def _render(text: str, name: str) -> str:
     return text.replace("__NAME__", name)
 
@@ -69,9 +93,8 @@ def _rename(root: Path, name: str) -> None:
 def _copy_template(template: str, dest: Path, name: str) -> None:
     source = template_paths().get(template)
     if source is None:
-        raise HillsError(
-            f"unknown template {template!r}. Available: {', '.join(available_templates())}"
-        )
+        known = "\n".join(f"  {name}  {summary}" for name, summary in template_summaries())
+        raise HillsError(f"no example named {template!r}. Available:\n{known}")
     for path in sorted(source.rglob("*")):
         relative = path.relative_to(source)
         target = dest / relative

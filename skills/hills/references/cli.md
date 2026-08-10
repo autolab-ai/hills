@@ -20,6 +20,7 @@ summary on your terminal.
 | `hills verify <report.json>` | check a report's signature |
 | `hills list` | registered hills |
 | `hills setup` | install this skill into detected harnesses |
+| `hills examples` | the example hills bundled with the tool |
 | `hills home` | where machine state lives |
 
 `hills eval` flags: `-p key=value` (repeatable), `--final`, `--force`,

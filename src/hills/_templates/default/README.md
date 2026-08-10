@@ -1,5 +1,8 @@
 # __NAME__
 
+A blank hill to fill in: the manifest, the evaluator and this contract are
+stubbed out and scored end to end, so `hills check` is green before you start.
+
 <!-- This README is the contract. The climbing agent reads it through
      `hills describe __NAME__` and nothing else. Replace every section below. -->
 

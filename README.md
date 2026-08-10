@@ -1,6 +1,6 @@
 <h1 align="center">hills</h1>
 
-<p align="center"><strong>Local verification environments for AI research agents</strong></p>
+<p align="center"><strong>Let an agent run your optimization loop, without letting it grade its own work</strong></p>
 
 <p align="center">
   <a href="#quickstart-for-humans">Quickstart</a> ·
@@ -16,9 +16,10 @@
   <img alt="Python 3.11+" src="https://img.shields.io/badge/python-3.11+-7fa846?style=flat-square&labelColor=1c1c1c">
 </p>
 
-> When an agent runs research experiments autonomously, the same model writes the
-> solution, evaluates it, and reports the result. It grades its own homework, so
-> its numbers cannot be trusted. **Hills separates the two roles.**
+> When you use an agent to run an iterative optimization loop, the same model
+> writes the code, runs the evaluation, and tells you the score. It grades its
+> own homework, so the numbers cannot be trusted. **hills splits those two jobs
+> apart.**
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/autolab-ai/hills/main/docs/banner.png"
@@ -26,14 +27,16 @@
        width="900">
 </p>
 
-A **hill** is a packaged evaluation task: a task description, an evaluator, and
-data. The agent (the **climber**) develops however it likes, but an official
-score comes only from `hills eval`, which runs the hill's evaluator in a separate
-process against a frozen, committed version of the hill and returns a signed
-report. The agent can query the verifier; it cannot modify it or grade itself.
+You package the evaluation into a **hill**: a folder holding the task
+description, the scoring code, and any data the agent must not see. You freeze
+it. From then on the agent can write whatever code it likes, but a score exists
+only if `hills eval` produced it, and every score comes back signed and tied to
+the exact version of the evaluator that produced it.
 
-The mental model is git. A hill is a versioned directory, `hills commit` freezes
-it, and every score is tied to the exact version that produced it.
+The mental model is git. A hill is a versioned folder, `hills commit` freezes it,
+and every score is pinned to the version that produced it. Change the evaluator
+and you get a new version, with a fresh history, because a changed evaluator is a
+different game.
 
 ## Quickstart, for humans
 
@@ -81,9 +84,9 @@ created demo/.hills/circle-packing
   version control  demo/.hills/circle-packing/.vc (empty; nothing committed yet)
 ```
 
-Nothing was asked of you and no file of yours was edited. `.hills/` carries a
-`.gitignore` containing `*`, so it excludes itself from your project's git the
-way `uv` excludes `.venv`.
+Setup asked you nothing and edited no file of yours. `.hills/` carries a
+`.gitignore` containing `*`, so it hides itself from your project's git the way
+`uv` hides `.venv`.
 
 **3. Check it, then freeze it.**
 
@@ -111,7 +114,7 @@ Scores from here on are tied to this tree hash. A new commit starts a fresh hist
 `commit` runs `check` as a gate, then regenerates the lock files from disk. The
 **tree hash** is the hill's identity, and every score from here on is tied to it.
 
-**4. Score a submission.** A submission is just a directory. The hill ships one:
+**4. Score a submission.** A submission is just a folder. The hill ships one:
 
 ```console
 $ cp -r .hills/circle-packing/examples/grid ./my-packing
@@ -181,28 +184,29 @@ That is the whole point of the tool, in one command.
 
 **Where to go next.** `hills describe circle-packing` prints the contract your
 agent would read. `hills new <name>` scaffolds a blank hill for your own task,
-and `hills new <name> -t nanogpt-10min` starts from the flagship example: a
-timed training run scored on a held-out split the climber never sees.
+and `hills examples` lists the examples you can start from, such as
+`nanogpt-10min`: a timed training run scored on a held-out split the agent
+never sees.
 
 ## What a hill is
 
-A directory, versioned by its own embedded git repository:
+A folder, versioned by its own private git repository:
 
 ```
 .hills/circle-packing/
-  hill.yaml        minimal manifest: watchdog, typed params, blob rules
-  README.md        the contract, written for the climbing agent
-  eval.py          THE entrypoint: def eval(submission: Path, **params) -> dict
-  private/         evaluator-only content; never enters git
-  examples/        minimal demonstration submissions
+  hill.yaml        settings: the watchdog, typed knobs, large-file rules
+  README.md        the task, written for the agent that will read it
+  eval.py          the scoring code: def eval(submission: Path, **params) -> dict
+  private/         what the agent must not see; never enters git
+  examples/        a submission that scores, so the format is unambiguous
   tests/           checks on the hill itself, run by `hills check`
-  .vc/             the hill's own git dir, named so it cannot collide with yours
+  .vc/             the hill's own git dir, named so it cannot clash with yours
 ```
 
-`private/` is the only special directory. Everything else is climber-readable by
-design, **including `eval.py`**: transparency about how you are judged is a
-feature. The consequence is that anything answer-revealing has to live in
-`private/`, not inline in the evaluator.
+`private/` is the only special folder: it holds what the agent must not see.
+Everything else it may read, **including `eval.py`**. That is deliberate -
+knowing how you are scored is fine, knowing the answers is not - so anything
+that gives away an answer belongs in `private/`, never inline in the evaluator.
 
 ### The evaluator contract
 
@@ -221,31 +225,32 @@ def eval(submission: Path, *, final: bool = False, **params) -> dict:
     }
 ```
 
-A submission is a directory. That is the whole input contract: a codebase, model
-weights, or a single JSON file are all just files in a directory.
+A submission is a folder. That is the whole input contract: a codebase, model
+weights, or a single JSON file are all just files in a folder.
 
-The tool never imports `eval.py` in-process. It runs a shim as a subprocess in
-the hill's own uv environment, so per-hill dependencies stay isolated, a watchdog
-can kill a hung evaluation, and an evaluator crash cannot take down the tool. For
-timed tasks the evaluator launches the submitted code itself and enforces the
-deadline, so the climber's code never runs the official clock.
+The evaluator always runs in its own process, in the hill's own uv environment.
+So each hill keeps its own dependencies, a hung evaluation can be killed, and an
+evaluator that crashes cannot take the tool down with it. When the task is timed,
+the evaluator starts the agent's code and stops it at the deadline, so the agent
+never holds the stopwatch.
 
-`config` entries describe the conditions of the measurement. Primary entries
-define comparability: two reports are comparable only if their primary config
-tuples match. Metrics are an ordered list with per-metric direction, and ranking
-is lexicographic in that order. Any set of reports therefore sorts into ranked
-groups with no configuration beyond the reports themselves.
+`config` records the conditions the number was measured under. Entries marked
+`primary` decide what may be compared with what: a score on an H100 and a score
+on an A100 never rank against each other. Metrics are a list in priority order,
+each with its own direction, so ties break down the list. Given any pile of
+reports, that is enough to sort them into ranked groups on its own.
 
 ## How it stays honest
 
-### Identity is content, not history
+### A hill is identified by its contents
 
-A hill's identity is its **git tree hash**, not its commit hash. Tree hashes are
-a pure function of content, so the same files give the same identity on any
-machine. All state is keyed by tree hash: a new hill version starts a fresh
-attempts history, because a changed evaluator is a new game.
+A hill is identified by its **git tree hash**, not its commit hash. A tree hash
+is computed purely from the files, so the same hill has the same identity on
+every machine, however it got there. Everything is filed under it, which is why
+editing the evaluator starts a fresh history rather than mixing old and new
+scores together.
 
-### Locks bind what git must not hold
+### Held-out data is hashed, never committed
 
 Two lock files, regenerated from disk at every commit:
 
@@ -260,27 +265,28 @@ file is the tracking, and integrity is enforced at the two moments it matters, a
 `commit` (locks regenerated from disk) and at `eval` (disk verified against the
 locks at HEAD; a mismatch is a hard error naming the file).
 
-### Reports are signed, history is chained
+### Scores are signed, and the log is tamper-evident
 
-The dict your evaluator returns is the report **core**. The tool wraps it in an
-envelope: hill name, tree hash, commit, submission hash, submission git lineage,
-params, tool version and package hash, timestamp, and an HMAC signature over the
-canonicalized report. The key lives at `~/.autolab/hills/key`, mode 0600,
-deliberately outside any project directory an agent works in.
+Your evaluator returns the metrics. Around them the tool wraps everything needed
+to check the score later: which hill and which version, a hash of the submission
+and the branch and commit it came from, the settings used, the tool version, a
+timestamp, and a signature over all of it. The signing key sits at
+`~/.autolab/hills/key`, mode 0600, deliberately outside any folder an agent
+works in - if the agent could read it, it could forge scores.
 
-Every eval appends to an attempts log whose entries are HMAC-chained to the one
-before, so a deleted or edited line is detectable. `hills attempts` prints the
-break rather than hiding it.
+Every eval appends a line to a log, and each line is cryptographically chained to
+the one before it, so a deleted or edited entry shows up. `hills attempts` prints
+the break rather than quietly hiding it.
 
 ### Trust posture
 
-This tool defends against **self-deception**: an agent loop accidentally or
-opportunistically grading its own work, editing its own scores, or drifting its
-own evaluation criteria.
+This tool defends against **fooling yourself**: an agent loop that grades its own
+work, edits its own scores, or lets the definition of the metric drift while it
+optimizes - usually by accident, which is what makes it hard to catch.
 
-It does not defend against a malicious human operator. Private files are ordinary
-files, protected by convention and by the tool only handing their location to the
-evaluator process. Signed reports are tamper-evident, not tamper-proof.
+It does not stop a determined human. Files under `private/` are ordinary files;
+nothing but convention keeps you out of them. Signed scores show tampering, they
+do not prevent it.
 
 The honest claim: **your agent cannot fake a hills report; you could, but then
 you're only lying to yourself.** Disputed results are re-runnable, because hills

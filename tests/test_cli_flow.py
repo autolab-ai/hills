@@ -235,3 +235,19 @@ def test_list_shows_the_registry(cli, committed, capsys):
     rows = json.loads(capsys.readouterr().out)
     assert rows[0]["name"] == "circle-packing"
     assert rows[0]["present"] is True
+
+
+def test_examples_are_listed_with_summaries(cli, capsys):
+    cli("examples", "--json")
+    listed = {row["name"]: row["summary"] for row in json.loads(capsys.readouterr().out)}
+    assert {"default", "circle-packing", "nanogpt-10min"} <= set(listed)
+    assert all(summary for summary in listed.values()), "every example needs a summary"
+    assert "hello-world" in listed["circle-packing"]
+
+
+def test_new_from_a_named_example(cli, project):
+    cli("new", "my-packing", "-t", "circle-packing")
+    hill = Hill.resolve("my-packing")
+    assert hill.manifest.name == "my-packing", "the manifest is renamed to the new hill"
+    assert (hill.root / "examples" / "grid" / "solution.json").is_file()
+    assert 'name = "my-packing"' in (hill.root / "pyproject.toml").read_text()
