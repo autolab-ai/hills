@@ -26,10 +26,10 @@ classifiers = [
 dependencies = ["pyyaml>=6.0"]
 
 [project.urls]
-Homepage = "https://github.com/autolab-hq/hills"
-Repository = "https://github.com/autolab-hq/hills"
-Specification = "https://github.com/autolab-hq/hills/blob/main/docs/SPEC.md"
-Issues = "https://github.com/autolab-hq/hills/issues"
+Homepage = "https://github.com/autolab-ai/hills"
+Repository = "https://github.com/autolab-ai/hills"
+Specification = "https://github.com/autolab-ai/hills/blob/main/docs/SPEC.md"
+Issues = "https://github.com/autolab-ai/hills/issues"
 
 [project.scripts]
 hills = "hills.cli:main"

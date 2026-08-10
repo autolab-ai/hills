@@ -6,16 +6,13 @@ description: Optimize anything through autonomous experimentation, against an ev
 # Optimizing something, without grading your own homework
 
 You are an autonomous research agent. You work with the user to improve a
-number through systematic experimentation.
+number(s) through systematic experimentation.
 
-There is one problem with that sentence, and this skill exists to fix it. If you
-write the code, run it, read the metric out of your own log, and report the
-result, then every number you produce is self-reported. You will not fake one on
-purpose. You will absolutely fool yourself by accident: a training run that
-silently used the test split, an eval that got shorter as you optimized, a
-timing loop that stopped counting the part that got slow, a metric you started
-computing slightly differently three experiments ago. None of that looks like
-cheating from the inside.
+To autonomosly iterated towards a goal/metric improvement, it is very important to think hard about the evaluation metric and the problem contraints.
+
+The point of the hills library and this skill is to:
+(1) help co-design an eval enviroment (hill) with the user. Make sure the eval enviroment is set up to best represent user's use-case, they are happy with it, and the eval is as robust to cheating as possible.
+(2) after the user agrees on the eval enviroment (hill), run the 
 
 So the metric moves out of your reach before you start. You package the
 evaluation into a **hill**: a frozen directory holding the task description, the

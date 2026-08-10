@@ -7,8 +7,8 @@
   <a href="#what-a-hill-is">What a hill is</a> ·
   <a href="#how-it-stays-honest">How it stays honest</a> ·
   <a href="#reference">Reference</a> ·
-  <a href="https://github.com/autolab-hq/hills/blob/main/docs/SPEC.md">Spec</a> ·
-  <a href="https://github.com/autolab-hq/hills/blob/main/skills/hills/SKILL.md">Agent skill</a>
+  <a href="https://github.com/autolab-ai/hills/blob/main/docs/SPEC.md">Spec</a> ·
+  <a href="https://github.com/autolab-ai/hills/blob/main/skills/hills/SKILL.md">Agent skill</a>
 </p>
 
 <p align="center">
@@ -21,7 +21,7 @@
 > its numbers cannot be trusted. **Hills separates the two roles.**
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/autolab-hq/hills/main/docs/banner.png"
+  <img src="https://raw.githubusercontent.com/autolab-ai/hills/main/docs/banner.png"
        alt="hills: agents can climb, evaluators can judge"
        width="900">
 </p>
@@ -51,7 +51,7 @@ If you want your coding agent to drive this instead, install the skill and it
 bootstraps the CLI itself:
 
 ```bash
-npx skills add autolab-hq/hills
+npx skills add autolab-ai/hills
 ```
 
 **2. Create a hill.** `circle-packing` ships with the tool: place 26 circles in
@@ -274,8 +274,8 @@ replay, not by trust in any single machine.
 
 ## Working with a coding agent
 
-The [agent skill](https://github.com/autolab-hq/hills/blob/main/skills/hills/SKILL.md) ships in this repo, version-locked to
-the CLI, and installs with `npx skills add autolab-hq/hills` or `hills setup`.
+The [agent skill](https://github.com/autolab-ai/hills/blob/main/skills/hills/SKILL.md) ships in this repo, version-locked to
+the CLI, and installs with `npx skills add autolab-ai/hills` or `hills setup`.
 You do not have to know what a hill is to use it: it triggers on any request to
 improve a number by iterating, and builds the hill as part of the job.
 
@@ -360,4 +360,4 @@ normalized GPU profile as primary config.
 
 ## License
 
-MIT. See [LICENSE](https://github.com/autolab-hq/hills/blob/main/LICENSE).
+MIT. See [LICENSE](https://github.com/autolab-ai/hills/blob/main/LICENSE).
