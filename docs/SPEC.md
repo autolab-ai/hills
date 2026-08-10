@@ -19,7 +19,7 @@ Design principles:
 A hill is a directory, versioned by its own embedded git repository:
 
 ```
-.hills/<name>/
+.autolab/hills/<name>/
   hill.yaml        # minimal manifest
   README.md        # the contract: task, submission format, metric — written for the climbing agent
   eval.py          # THE entrypoint — fixed name, at hill root
@@ -32,7 +32,7 @@ A hill is a directory, versioned by its own embedded git repository:
 
 - **`private/` is the only special directory.** It holds anything the evaluator needs but climbers must not see: held-out test splits, hidden tolerances or test cases, reference solutions. It may contain data or code; `eval.py` may import from it.
 - Everything else in the hill is climber-readable by design — including `eval.py`. Transparency about how you're judged is a feature. Consequence: any answer-revealing constants in evaluator code (hidden test shapes, expected outputs) must live in `private/`, not inline in `eval.py`.
-- Hills live inside the user's project in `.hills/`. That directory is created with its own `.gitignore` containing `*`, so it excludes itself from the project's git automatically (the same trick uv uses for `.venv`) — no edits to any user file, no prompts. A user who wants hills tracked in their project repo can edit that gitignore themselves; `.vc/` and `private/` must always remain excluded.
+- Hills live inside the user's project in `.autolab/hills/`. The `.autolab/` directory is created with its own `.gitignore` containing `*`, so it excludes itself from the project's git automatically (the same trick uv uses for `.venv`) — no edits to any user file, no prompts. A user who wants hills tracked in their project repo can edit that gitignore themselves; `.vc/` and `private/` must always remain excluded.
 - A global registry (§7) maps hill names to paths, so all commands address hills by name from anywhere.
 
 ## 3. Manifest (`hill.yaml`)
@@ -121,7 +121,7 @@ The evaluator's returned dict is the report **core**. The tool wraps it in the *
 Unitary, git-style commands. The tool is fully local and offline.
 
 ```
-hills new <name>               scaffold a hill in .hills/<name>/, init .vc, register it
+hills new <name>               scaffold a hill in .autolab/hills/<name>/, init .vc, register it
 hills check <name>             validate manifest + evaluator return schema; run tests/ if present
 hills status <name>            working-tree changes vs last commit (wraps git status)
 hills commit <name> -m "..."   run check → regenerate locks → git commit; print tree hash
@@ -188,7 +188,7 @@ Starting state: a user has `my-llm/` containing `train.py` (training and evaluat
 1. **Install (the only setup command):** `npx skills add autolab-ai/hills`.
 2. **Invoke.** The user tells their agent: "Make a hill out of this repo — val bpb after a 10-minute training run, test set hidden — then climb it." The agent checks `hills --version`, installs the CLI via uv if missing (first run lazily creates `~/.autolab/hills/` with a one-line notice), orients, and confirms the plan.
 3. **Interview.** Two or three questions: how much feedback should failed runs expose? confirm test stays hidden and the clock is evaluator-owned; confirm the eval logic will be frozen into the hill.
-4. **Scaffold and fill.** `hills new nanogpt-10min` creates `.hills/nanogpt-10min/` with `.vc` and the self-ignoring `.hills/.gitignore`. The agent writes `hill.yaml` (watchdog, `params: time_limit_s`, `blobs.track: ["data/**"]`), `README.md` (submission contract: a directory with `train.py`, invoked as `python train.py --data <hill>/data/train.bin --out <workdir>/checkpoints/`; checkpoint expected at `checkpoints/final.pt`), and `eval.py` (launches the submitted `train.py`, kills at `time_limit_s`, runs the frozen bpb evaluation from the user's original code against `private/data/val.bin` — or `test.bin` in final mode — and detects the GPU, reporting a normalized profile as primary config). It moves val/test into `private/data/`, leaves training data at `data/`, writes a minimal `examples/` submission and `tests/` asserting the evaluator accepts it and rejects a broken variant. It notes: "I read only the header bytes of val/test to confirm format."
+4. **Scaffold and fill.** `hills new nanogpt-10min` creates `.autolab/hills/nanogpt-10min/` with `.vc` and the self-ignoring `.autolab/.gitignore`. The agent writes `hill.yaml` (watchdog, `params: time_limit_s`, `blobs.track: ["data/**"]`), `README.md` (submission contract: a directory with `train.py`, invoked as `python train.py --data <hill>/data/train.bin --out <workdir>/checkpoints/`; checkpoint expected at `checkpoints/final.pt`), and `eval.py` (launches the submitted `train.py`, kills at `time_limit_s`, runs the frozen bpb evaluation from the user's original code against `private/data/val.bin` — or `test.bin` in final mode — and detects the GPU, reporting a normalized profile as primary config). It moves val/test into `private/data/`, leaves training data at `data/`, writes a minimal `examples/` submission and `tests/` asserting the evaluator accepts it and rejects a broken variant. It notes: "I read only the header bytes of val/test to confirm format."
 5. **Check.** `hills check nanogpt-10min` — manifest, contract, tests all green.
 6. **Decision brief.** The agent presents: what the hill measures; closed vectors (clock evaluator-owned, eval code frozen, splits private); open vectors as the user's call ("model size is unconstrained — a climber can win by scaling up; constrain it, make it a primary config, or accept it?"). The user decides.
 7. **Commit (the trust transition).** The user runs `hills commit nanogpt-10min -m "initial"` themselves: check gate → locks written (`private.lock`: 2 files; `blobs.lock`: train.bin) → committed; tree hash printed.

@@ -80,12 +80,12 @@ the unit square without overlaps, maximize the sum of the radii.
 $ mkdir demo && cd demo && git init -q .
 $ hills new circle-packing -t circle-packing
 hills: created machine state at ~/.autolab/hills
-created demo/.hills/circle-packing
+created demo/.autolab/hills/circle-packing
   template   circle-packing
-  version control  demo/.hills/circle-packing/.vc (empty; nothing committed yet)
+  version control  demo/.autolab/hills/circle-packing/.vc (empty; nothing committed yet)
 ```
 
-Setup asked you nothing and edited no file of yours. `.hills/` carries a
+Setup asked you nothing and edited no file of yours. `.autolab/` carries a
 `.gitignore` containing `*`, so it hides itself from your project's git the way
 `uv` hides `.venv`.
 
@@ -118,7 +118,7 @@ Scores from here on are tied to this tree hash. A new commit starts a fresh hist
 **4. Score a submission.** A submission is just a folder. The hill ships one:
 
 ```console
-$ cp -r .hills/circle-packing/examples/grid ./my-packing
+$ cp -r .autolab/hills/circle-packing/examples/grid ./my-packing
 $ hills eval ./my-packing -H circle-packing -o report.json
 
 circle-packing @ 0a93cd12b436
@@ -194,7 +194,7 @@ never sees.
 A folder, versioned by its own private git repository:
 
 ```
-.hills/circle-packing/
+.autolab/hills/circle-packing/
   hill.yaml        settings: the watchdog, typed knobs, large-file rules
   README.md        the task, written for the agent that will read it
   eval.py          the scoring code: def eval(submission: Path, **params) -> dict

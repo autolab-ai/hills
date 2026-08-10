@@ -9,7 +9,7 @@ summary on your terminal.
 
 | command | what it does |
 |---|---|
-| `hills new <name> [-t <template>]` | scaffold `.hills/<name>/`, init `.vc`, register it |
+| `hills new <name> [-t <template>]` | scaffold `.autolab/hills/<name>/`, init `.vc`, register it |
 | `hills check <name>` | manifest, evaluator contract, `tests/` |
 | `hills status <name>` | changes since the last commit, including lock drift git cannot see |
 | `hills commit <name> -m "..."` | check, regenerate locks, commit, print the tree hash |
@@ -65,7 +65,7 @@ which is expected. Re-run the evaluation instead of arguing about the file.
 ## Where things live
 
 ```
-.hills/<name>/                              the hill, inside the user's project
+.autolab/hills/<name>/                      the hill, inside the user's project
 ~/.autolab/hills/registry.json              name -> path, current tree hash
 ~/.autolab/hills/key                        per-machine signing key, mode 0600
 ~/.autolab/hills/state/<name>@<tree>/attempts.jsonl

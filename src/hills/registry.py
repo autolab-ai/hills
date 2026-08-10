@@ -73,12 +73,12 @@ def entries() -> dict:
 
 
 def resolve(name: str) -> Path:
-    """Find a hill by name: registry first, then .hills/<name> under the cwd's project."""
+    """Find a hill by name: registry first, then .autolab/hills/<name> under the project."""
     entry = entries().get(name)
     if entry and Path(entry["path"]).is_dir():
         return Path(entry["path"])
 
-    local = paths.project_root(Path.cwd()) / paths.HILLS_DIRNAME / name
+    local = paths.project_hills(Path.cwd()) / name
     if local.is_dir():
         register(name, local)
         return local

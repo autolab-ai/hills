@@ -10,7 +10,7 @@ SKIP_DIRS = frozenset(
     {
         ".git",
         ".vc",
-        ".hills",
+        ".autolab",
         ".venv",
         "venv",
         "__pycache__",

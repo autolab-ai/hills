@@ -4,7 +4,8 @@ import os
 import sys
 from pathlib import Path
 
-HILLS_DIRNAME = ".hills"
+PROJECT_DIRNAME = ".autolab"
+PROJECT_HILLS = "hills"
 
 
 def home() -> Path:
@@ -45,9 +46,14 @@ def locks_root() -> Path:
 
 
 def project_root(start: Path) -> Path:
-    """Nearest ancestor holding a .git or an existing .hills, else `start`."""
+    """Nearest ancestor holding a .git or an existing .autolab, else `start`."""
     start = start.resolve()
     for candidate in [start, *start.parents]:
-        if (candidate / ".git").exists() or (candidate / HILLS_DIRNAME).is_dir():
+        if (candidate / ".git").exists() or (candidate / PROJECT_DIRNAME).is_dir():
             return candidate
     return start
+
+
+def project_hills(start: Path) -> Path:
+    """Where hills live inside a project: <project>/.autolab/hills."""
+    return project_root(start) / PROJECT_DIRNAME / PROJECT_HILLS

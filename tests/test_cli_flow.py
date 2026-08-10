@@ -16,7 +16,7 @@ pytestmark = pytest.mark.usefixtures("project")
 @pytest.fixture
 def packing(project, cli):
     cli("new", "circle-packing", "-t", "circle-packing")
-    return project / ".hills" / "circle-packing"
+    return project / ".autolab" / "hills" / "circle-packing"
 
 
 @pytest.fixture
@@ -37,7 +37,7 @@ def read_report(capsys) -> dict:
 
 
 def test_new_hill_is_self_ignoring(project, packing):
-    assert (project / ".hills" / ".gitignore").read_text().splitlines()[-1] == "*"
+    assert (project / ".autolab" / ".gitignore").read_text().splitlines()[-1] == "*"
     assert subprocess.run(
         ["git", "status", "--porcelain"], cwd=project, capture_output=True, text=True
     ).stdout.strip() == ""

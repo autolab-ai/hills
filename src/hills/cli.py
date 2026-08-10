@@ -399,7 +399,7 @@ def build_parser() -> argparse.ArgumentParser:
         child.add_argument("--json", action="store_true", help="machine-readable output")
         return child
 
-    new = add("new", "scaffold a hill in .hills/<name>, init its version control, register it")
+    new = add("new", "scaffold a hill in .autolab/hills/<name>, init its version control, register it")
     new.add_argument("name")
     new.add_argument(
         "-t",

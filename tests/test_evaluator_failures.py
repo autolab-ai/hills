@@ -16,7 +16,7 @@ HEADER = "from pathlib import Path\n\n\ndef eval(submission, *, final=False, **p
 @pytest.fixture
 def hill(project, cli):
     cli("new", "demo")
-    return project / ".hills" / "demo"
+    return project / ".autolab" / "hills" / "demo"
 
 
 @pytest.fixture
