@@ -33,10 +33,9 @@ it. From then on the agent can write whatever code it likes, but a score exists
 only if `hills eval` produced it, and every score comes back signed and tied to
 the exact version of the evaluator that produced it.
 
-The mental model is git. A hill is a versioned folder, `hills commit` freezes it,
-and every score is pinned to the version that produced it. Change the evaluator
-and you get a new version, with a fresh history, because a changed evaluator is a
-different game.
+A hill is a versioned folder: `hills commit` freezes it, and every score is
+pinned to the version that produced it. Change the evaluator and you get a new
+version with a fresh history, because a changed evaluator is a different game.
 
 ## Quickstart, for humans
 
@@ -180,7 +179,7 @@ $ hills verify report.json
 signature INVALID: this report was edited, or it was signed on another machine.
 ```
 
-That is the whole point of the tool, in one command.
+An edited score stops verifying. Nobody has to notice the edit.
 
 **Where to go next.** `hills describe circle-packing` prints the contract your
 agent would read. `hills new <name>` scaffolds a blank hill for your own task,
