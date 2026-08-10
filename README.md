@@ -1,6 +1,10 @@
-# hills
+<p align="center">
+  <img src="https://raw.githubusercontent.com/QKayV/hills/main/docs/banner.png"
+       alt="hills: agents can climb, evaluators can judge"
+       width="900">
+</p>
 
-Local verification environments for AI research agents.
+<p align="center">Local verification environments for AI research agents.</p>
 
 When an agent runs research experiments autonomously, the same model writes the
 solution, evaluates it, and reports the result. It grades its own homework, so
