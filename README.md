@@ -14,8 +14,6 @@
 <p align="center">
   <img alt="MIT license" src="https://img.shields.io/badge/license-MIT-7fa846?style=flat-square&labelColor=1c1c1c">
   <img alt="Python 3.11+" src="https://img.shields.io/badge/python-3.11+-7fa846?style=flat-square&labelColor=1c1c1c">
-  <img alt="Local and offline" src="https://img.shields.io/badge/runs-local%20%26%20offline-7fa846?style=flat-square&labelColor=1c1c1c">
-  <img alt="Zero configuration" src="https://img.shields.io/badge/setup-zero%20decisions-7fa846?style=flat-square&labelColor=1c1c1c">
 </p>
 
 > When an agent runs research experiments autonomously, the same model writes the
