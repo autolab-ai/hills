@@ -9,7 +9,9 @@ stubbed out and scored end to end, so `hills check` is green before you start.
 ## Task
 
 Describe what the climber has to build, in the terms an ML engineer would use.
-State the objective, what is fixed, and what is free to vary.
+State the objective, what is fixed, and what is free to vary. Say what the metric
+below is standing in for, so a submission that scores well by skipping the point
+is recognizable as such.
 
 ## Submission format
 

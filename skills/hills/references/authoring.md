@@ -1,14 +1,19 @@
 # Building the hill (phases 2 and 3)
 
 Read this once the phase 2 plan is agreed. The goal is an evaluation that still
-measures what it claims to when an agent optimizing the metric goes looking for
+measures the user's goal when an agent optimizing the metric goes looking for
 shortcuts, which in a few hours is what you will be doing.
 
 ## Asking the right questions in phase 2
 
-Every question in the plan exists to make the hill harder to cheat. Three of
-them carry most of the weight, so if the user is impatient, ask these:
+The plan's questions exist so the hill measures the user's goal rather than
+drifting into measuring something adjacent to it. Four carry most of the weight,
+so if the user is impatient, ask these:
 
+- **What is this number standing in for?** Ask it first, answer it out loud, and
+  check the answer with them. A toy dataset, a proxy metric or a small benchmark
+  is nearly always a stand-in for something larger, and what it stands in for
+  decides how much the rest of the design has to defend.
 - **What is held out, and what may be trained or tuned on?** Confirm the split
   moves into `private/` and never enters git. If the user says "there is no
   held-out set", that is the first thing to fix, not a detail to work around.
@@ -22,8 +27,7 @@ them carry most of the weight, so if the user is impatient, ask these:
 
 Also confirm out loud that the evaluation logic is being **copied and frozen**
 into the hill rather than imported from the project. People are often surprised
-by this, and it is the thing that stops old scores from silently changing
-meaning when the project moves on.
+by this, and it is what stops old scores from silently changing meaning.
 
 ## Filling in the hill
 
@@ -62,36 +66,46 @@ did. You are writing the evaluator; you should not be carrying around what is in
 the test set.
 
 **`README.md` is the contract**, and the only thing the climbing context reads.
-Task, submission format as a directory listing, how the metric is computed,
-params, test mode, and a short "what the evaluator will not do".
+Task, what the number stands in for, submission format as a directory listing,
+how the metric is computed, params, test mode, and a short "what the evaluator
+will not do". The climber optimizes what this file says, so a goal stated here
+is the cheapest defense the hill has.
 
-**`examples/`** needs at least one submission that scores. It answers "what does
-a submission look like" faster than prose.
+**`examples/`** needs at least one submission that scores; it answers "what does
+a submission look like" faster than prose. **`tests/`** are ordinary pytest
+files, and `from hills import run_evaluator` gives you `run_evaluator(hill_path,
+submission_path, **params) -> dict`. Write at least: the example scores as
+expected, a broken variant fails with a useful message, and the primary config is
+what you think it is. Turn expensive params down so `hills check` stays fast.
 
-**`tests/`** are ordinary pytest files. `from hills import run_evaluator` gives
-you `run_evaluator(hill_path, submission_path, **params) -> dict`. Write at
-least: the example scores as expected, a broken variant fails with a useful
-message, and the primary config is what you think it is. Turn expensive params
-down so `hills check` stays fast.
+## Attacking your own draft
 
-## The red-team pass
+Before showing the user anything, try to beat the hill you just wrote. What you
+find sorts into two piles, and they are handled differently.
 
-Before showing the user anything, attack the hill you just wrote. Take the
-cheating list from phase 2, add the standard vectors, and for each one either
-close it in the evaluator or put it in the brief.
+**Plumbing leaks** have a right answer, so close them and move on:
 
-| vector | what it looks like | how to close it |
+| leak | what it looks like | how to close it |
 |---|---|---|
 | metric computed by the submission | evaluator reads a number the submission wrote | compute it from raw artifacts only |
 | clock not evaluator-owned | submission self-reports elapsed time, or sleeps past a soft limit | evaluator launches the process and kills it at the deadline |
 | leakage through feedback | error messages echo test inputs, counts, or per-case answers | say what failed, not what the answer was |
 | leakage through the tree | test data committed "just this once" | it never enters git; `private.lock` binds it by hash |
 | stale artifact reuse | evaluator finds a checkpoint from a previous run | fresh working directory per evaluation |
-| degenerate optimum | metric does not constrain size, memory or precision, so scaling up wins | constrain it, make it primary config, or surface it |
 | evaluator drift | evaluator imports the user's project code | freeze a copy inside the hill |
 
-The last two rows are the ones that most often survive into the brief. That is
-fine, as long as they arrive there labeled.
+**A gap between the metric and the goal** is the other pile: a way of scoring
+well that skips the work the user cares about. A closed form the task was meant
+to approximate, a degenerate output the metric does not forbid, scaling up
+something the metric does not constrain. Measure it, because "sampling the closed
+form scores four times better than a trained model" tells the user far more than
+"the metric is gameable".
+
+Then bring it to them. Closing a gap usually means changing their task, which is
+theirs to decide and not a defect you fix on their behalf. Give the finding, its
+size, and the responses from the SKILL with what each costs, and recommend the
+smallest one the goal survives. A toy problem with a known shortcut is often
+exactly what the user wants for a first run.
 
 ## When to propose more than one hill
 
@@ -102,9 +116,11 @@ stated. Two concrete proposals, not an open-ended menu.
 
 ## The brief, and the handoff
 
-The brief goes in your message, not in a file, and its third section is the one
-that matters: vectors still open because the objective underdetermines them, each
-presented as the user's decision with concrete options and your recommendation.
+The brief goes in your message, not in a file. Open it with the goal in one
+sentence and how the hill measures it, so the user can correct your reading
+before reading anything else. Its last section is the one that matters: each gap
+you measured, presented as the user's decision with concrete options and your
+recommendation.
 
 Then stop. The human runs `hills commit`. After it lands, ask two things: proceed
 to climbing, and what the stopping criteria are. On yes, delegate phase 4 to a

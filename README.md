@@ -305,16 +305,19 @@ It runs in four phases.
 
 1. **Confirm the project.** A minute, no more. What is this, and is it what you
    want to optimize?
-2. **Agree on a plan.** Goal and direction, files in scope, files that are
-   read-only, what is held out, the constraint that makes runs comparable, what
-   would count as cheating, the run command, and when to stop. You confirm or
-   edit it before anything is built.
+2. **Agree on a plan.** What the number stands in for, goal and direction, files
+   in scope, files that are read-only, what is held out, the constraint that
+   makes runs comparable, the ways the number could move without the work being
+   done, the run command, and when to stop. You confirm or edit it before
+   anything is built.
 3. **Build and freeze the hill.** The plan becomes a hill: read-only files are
    frozen into it, held-out data moves into `private/`, and the scoring code is
    copied rather than imported so it cannot drift with your project. The agent
-   red-teams its own draft, then presents a brief listing the gaming vectors it
-   closed and the ones that remain open as your decision. **You** run
-   `hills commit`. The agent that wrote the evaluator does not get to freeze it.
+   then tries to beat its own draft, and presents a brief: the leaks it closed,
+   and any gap it measured between the metric and what you actually want, with
+   options from a sentence in the README up to changing the task. Which one you
+   take is your call. **You** run `hills commit`. The agent that wrote the
+   evaluator does not get to freeze it.
 4. **The experiment loop.** A fresh subagent starts from `hills describe` and
    nothing else, then loops: edit, commit, dev-run, `hills eval`, decide. It does
    not stop to ask permission, and it runs until your stopping criteria are met.

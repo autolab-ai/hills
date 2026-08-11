@@ -13,8 +13,10 @@ hills describe <name>
 
 That returns the README, the params schema, the file list of the committed hill,
 and the tree hash you will be scored against. Read the README completely before
-writing code, then look at `examples/` in the hill directory: those are working
-submissions and they answer format questions faster than reasoning does.
+writing code, including what it says the number stands in for; when the metric
+and that goal point in different directions, the goal is what you are optimizing.
+Then look at `examples/` in the hill directory: those are working submissions and
+they answer format questions faster than reasoning does.
 
 You may read anything in the hill except `private/`. `eval.py` is meant to be
 read, so understanding how you are scored is encouraged; reading the held-out
@@ -89,21 +91,19 @@ not moved the metric and you have no untried idea worth its cost. Then:
 1. `hills eval <best> -H <name> --final`
 2. Report: the attempts table, the best verified result with its config and
    `submission_git`, the `--final` report, and briefly what did not work. Dev
-   numbers only if useful, and only labeled unofficial.
+   numbers only if useful, and only labeled unofficial. If you did not beat the
+   baseline, say so plainly; a hill you did not climb is a result.
 
 ## Failure modes to avoid
 
-- **Reporting a dev number as a result.** The most common way this loop goes
-  wrong. If `hills eval` did not produce it, it is not a result.
-- **Tuning against the test split.** `--final` is for the final claim. Running it
-  repeatedly and keeping the best turns the test split into a validation split.
-- **Editing the hill.** If you believe the evaluator is wrong, stop and tell the
-  user what you think is wrong and why. `hills eval` refuses a dirty hill anyway,
-  and a changed hill has a different tree hash, so your score would no longer be
-  comparable to anything before it.
-- **Optimizing the checker instead of the task.** If you find a way to score well
-  without doing the task, that is a finding to report, not a result to submit.
+The iron rules in the SKILL cover most of them. Two more that come up in the
+loop itself:
+
 - **Claiming progress from one noisy run.** Two attempts differing by less than
-  the run-to-run spread are not an improvement.
+  the run-to-run spread are not an improvement. Re-run instead.
 - **Stopping early.** The user may be asleep. Run until the criteria are met or
   you are interrupted.
+
+And one that is easy to misread as a win: if you find a way to score well
+without doing what the README says the task is for, that is a finding to report
+to the user, not a result to submit.
