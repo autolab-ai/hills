@@ -1,0 +1,31 @@
+cff-version: 1.2.0
+title: "hills: frozen evaluations for unattended agent optimization loops"
+message: "If you use hills in your work, please cite it as below."
+type: software
+authors:
+  - given-names: Artem
+    family-names: Lukoianov
+    affiliation: Autolab
+  - given-names: Serge
+    family-names: Klein
+    affiliation: Autolab
+  - given-names: Serge
+    family-names: Didenko
+    affiliation: Autolab
+repository-code: "https://github.com/autolab-ai/hills"
+url: "https://github.com/autolab-ai/hills"
+abstract: >-
+  hills packages an evaluation into a frozen, versioned directory so that an
+  agent can run an optimization loop unattended without grading its own work.
+  The agent develops freely, but a score exists only if the frozen evaluator
+  produced it, and every score comes back signed and tied to the exact version
+  of the evaluation that produced it.
+keywords:
+  - evaluation
+  - benchmark
+  - agents
+  - verification
+  - machine-learning
+license: MIT
+version: 0.1.5
+date-released: "2026-08-11"

@@ -1,6 +1,6 @@
 <h1 align="center">hills</h1>
 
-<p align="center"><strong>Design the evaluation once, let the agent optimize for days, trust the number you come back to</strong></p>
+<p align="center"><strong>Trusted evaluation environments for your agents to optimize against</strong></p>
 
 <p align="center">
   <a href="#quickstart">Quickstart</a> ·
@@ -17,12 +17,7 @@
   <img alt="Python 3.11+" src="https://img.shields.io/badge/python-3.11+-7fa846?style=flat-square&labelColor=1c1c1c">
 </p>
 
-> You leave an agent optimizing overnight, or for three days, and come back to a
-> number. You were not watching, and the same model wrote the code, ran the
-> evaluation and decided what the result was. It may have edited the evaluation,
-> optimized a proxy that came apart from your goal, or reported something it
-> never measured. Working out which of those happened takes about as long as the
-> run did.
+> Your new job is to write agentic loops. Hills allows you to create an environment you trust and let the agent optimize against it without your supervision.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/autolab-ai/hills/main/docs/banner.png"
@@ -416,6 +411,25 @@ The two shipped hills: **circle-packing**, the hello-world used above, exact
 arithmetic and no private data; and **nanogpt-10min**, a timed training run whose
 evaluator owns the clock, keeps its splits in `private/`, and reports a
 normalized GPU profile as primary config.
+
+## Citation
+
+If you find this repo useful, please cite it:
+
+```bibtex
+@software{hills2026,
+  title        = {hills: frozen evaluations for unattended agent optimization loops},
+  author       = {Lukoianov, Artem and Klein, Serge and Didenko, Serge},
+  organization = {Autolab},
+  year         = {2026},
+  version      = {0.1.5},
+  url          = {https://github.com/autolab-ai/hills}
+}
+```
+
+The repository also carries a [`CITATION.cff`](https://github.com/autolab-ai/hills/blob/main/CITATION.cff),
+so GitHub's "Cite this repository" button gives you the same entry in APA or
+BibTeX without copying from here.
 
 ## License
 
