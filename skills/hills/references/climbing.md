@@ -22,6 +22,12 @@ You may read anything in the hill except `private/`. `eval.py` is meant to be
 read, so understanding how you are scored is encouraged; reading the held-out
 data is not.
 
+**Score the baseline before you change anything.** It is the reference every
+later claim is measured against, and it proves the pipeline runs before you have
+an idea invested in it. Score it twice if an attempt is cheap: the difference
+between two evaluations of the same submission is the run-to-run spread, and
+nothing smaller than that is an improvement you can honestly claim.
+
 ## Branches
 
 Default to a single branch, `hills/<name>`, with one commit per experiment:
@@ -46,22 +52,23 @@ search, give each its own worktree and its own branch:
 git worktree add ../<project>-directions/<direction> -b hills/<name>-<direction>
 ```
 
-Two or three directions is usually right. More than that and none of them gets
-enough attempts to say anything. The same no-reset rule applies inside each.
+How many is arithmetic rather than taste: a direction needs enough attempts to
+separate a real gain from the spread you measured at the start, so divide the
+time you have by the cost of one attempt. Two or three is common at minutes per
+attempt, and more is right at seconds. The same no-reset rule applies inside each.
 
 ## The loop
 
-1. Edit the in-scope files with one idea.
-2. Commit.
-3. Dev-run informally if you need to know whether the idea works at all. These
-   numbers are **unofficial** and must be labeled that way every time.
-4. `hills eval <dir> -H <name>`, redirecting verbose output to a file rather
-   than into your context.
-5. Read `passed`, `metrics`, `config`, `details`. `details` carries the feedback
-   the hill author chose to expose: log tails, per-case results, failure reasons.
-6. Decide and record why. The attempts log keeps the numbers; your notes keep the
-   reasoning, which is the part that stops you re-running a dead idea in an hour.
-7. Repeat.
+Edit the in-scope files, commit, `hills eval <dir> -H <name>`, read the report,
+decide, repeat. One idea per iteration is the default because it is what makes a
+result attributable; depart from it deliberately rather than by accident.
+
+Redirect verbose eval output to a file rather than into your context. Read
+`passed`, `metrics`, `config` and `details`. `details` carries the feedback the
+hill author chose to expose: log tails, per-case results, failure reasons.
+
+The attempts log keeps the numbers. Your notes keep why you decided what you
+decided, which is the part that stops you re-running a dead idea in an hour.
 
 If the hill declares an exclusive device, official evals serialize. A second one
 fails fast; `--queue` waits instead. When you wait, say so, and use the time for
@@ -94,16 +101,24 @@ not moved the metric and you have no untried idea worth its cost. Then:
    numbers only if useful, and only labeled unofficial. If you did not beat the
    baseline, say so plainly; a hill you did not climb is a result.
 
-## Failure modes to avoid
+## Selection
 
-The iron rules in the SKILL cover most of them. Two more that come up in the
-loop itself:
+The iron rules list the behaviours. This is the reasoning behind the one that is
+easiest to talk yourself into.
 
-- **Claiming progress from one noisy run.** Two attempts differing by less than
-  the run-to-run spread are not an improvement. Re-run instead.
-- **Stopping early.** The user may be asleep. Run until the criteria are met or
-  you are interrupted.
+A best-over-attempts is an order statistic, not a measurement. When evaluation is
+noisy, running the same artifact again can only raise the maximum, so a headline
+taken from "best attempt so far" drifts upward whether or not anything improved.
+In a corpus of real optimization runs we read, one agent scored 18 iterations of
+a byte-identical file and reported the luckiest of the 18, sitting 0.16 percent
+above their mean. Nothing was forged and every report was honest. The corruption
+was in the aggregation.
 
-And one that is easy to misread as a win: if you find a way to score well
+So a re-run measures noise rather than giving a submission a second chance at a
+score, a difference inside the spread is not a difference, and if you evaluate
+anything twice the spread is part of the result.
+
+The other way to end badly is stopping early. The user may be asleep. Run until
+the criteria are met or you are interrupted. And if you find a way to score well
 without doing what the README says the task is for, that is a finding to report
 to the user, not a result to submit.

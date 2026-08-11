@@ -29,31 +29,38 @@ Four phases: confirm the project, agree a plan, build and freeze the hill, run
 the loop. One human touchpoint, at the end of phase 3; after it you do not ask
 permission again.
 
+Everything before the iron rules is guidance, and you know your task better than
+this file does: its lists are the cases that recur, not the cases that exist. The
+iron rules are the opposite. They hold however well the run is going, because an
+agent optimizing a number finds its way around them.
+
 ## Phase 0: make sure the CLI is there
 
 `hills --version`; if missing, `uv tool install hills` and check again. First run
 creates `~/.autolab/hills/` and says so. `hills list` shows the hills in this
 project, found by walking up for `.autolab/hills/`.
 
-## Phase 1: confirm the project (be quick, a minute or two, max), and establish user's intent
+## Phase 1: confirm the project and the intent
 
-1. Glance at the working directory: top-level files, README if present,
-   `pyproject.toml` / `package.json` / `Cargo.toml`. Just enough to identify
-   what this is. Are there any existing hills if you do `hills list`? What do they do?
-2. Establish user's intent. Describe to the user what you see, make your best guess about their intent and clarify it. You need to understand - do they want to optimize this project? improve something about it, create a new hill, use existing one? If not this directory, where is it? Do they want to do something else?
-   Include what they are actually after, not just which number moves: "you want
-   to train a diffusion model, and the parabola is a toy dataset for it" is the
-   kind of sentence that has to be right before anything else is worth designing.
-3. If they point you elsewhere, `cd` there before continuing.
+Work out what the project is and what the user is after, then stop. Read what you
+need for a good guess; what you defer is designing, not reading. The top-level
+files and `hills list` are usually enough. Then say back what you think they want
+to optimize and what it stands in for: "you want to train a diffusion model, and
+the parabola is a toy dataset for it" is the kind of sentence that has to be right
+before anything else is worth designing. Settle the ambiguities that change the
+work, such as this project or another one, a new hill or an existing one. If they
+point you elsewhere, `cd` there before continuing.
 
-Do not read the codebase deeply yet. That happens in phase 2.
+A few minutes. If they arrived with a clear ask, one sentence back and move on.
 
 ## Phase 2: agree on a plan
 
-Read the project properly now, then work with the user to define the experiment
-and create a new hill or reuse an existing one. Cover all of the following and
-present it back as labeled sections, easy to scan and easy to point at and
-revise.
+Read the project properly now. The plan is finished when you both know what the
+number stands in for, what is held out, what makes two runs comparable, where the
+editable and frozen files divide, and when to stop. The sections below are the
+usual shape of that; present them back as labeled sections, easy to scan and easy
+to revise. Scale the exchange to the task: a toy hill deserves two questions, a
+benchmark other people will run deserves twenty.
 
 - **Goal.** What number, up or down, and what it stands in for. If they name
   several, say which is primary; the rest become secondary metrics that break
@@ -107,20 +114,20 @@ become checks in the evaluator or reported config; held-out data moves to
 5. **Write an example submission and tests.** `examples/` proves the format;
    `tests/` stops the evaluator drifting. `from hills import run_evaluator` makes
    a test three lines; turn expensive params down there.
-6. **Close the plumbing leaks.** The evaluator computes the metric itself from
-   raw artifacts, owns the clock and the deadline, says what failed without
-   echoing held-out content, and starts each evaluation in a fresh working
-   directory; held-out data never enters git. These have a right answer and no
-   judgment call in them, so fix them without asking. Full table in
-   `references/authoring.md`.
+6. **Close the plumbing leaks.** Each one is either the evaluator trusting a
+   number the submission produced, or information travelling outward from
+   `private/`. Both have right answers, so close them without asking: compute the
+   metric from raw artifacts, own the clock, say what failed without echoing
+   held-out content, start each evaluation clean. `references/authoring.md`
+   tabulates the ones that recur, and you are expected to find ones it does not.
 7. **Measure the gap between the metric and the goal.** Try to beat the hill
    without doing the work: the closed form, the degenerate output, the constant,
    whatever scores well and teaches the user nothing. Run it if you can, so the
    gap is a number rather than a worry.
 
    Then hand it to the user. A gap is information about their task, not a
-   verdict on it, and how much to spend closing it is their call. Say what you
-   found, how big it is, and offer the range, cheapest first:
+   verdict on it, and how much to spend closing it is their call. Responses run
+   from restating the goal to changing the task, with cost rising along the way:
 
    | response | what it costs |
    |---|---|
@@ -130,42 +137,39 @@ become checks in the evaluator or reported config; held-out data moves to
    | add a judge, LLM or programmatic, that checks the submission did the thing | an API key, latency, some noise |
    | change the task so the shortcut does not exist | the largest change, and it is their task |
 
-   Recommend the smallest response the user's goal survives. The last row is a
-   proposal you argue for, never your default: a toy problem with a closed-form
-   shortcut is often exactly what someone wants for a first run, and one
-   sentence in the README can be enough.
-
-8. **Check.** `hills check <name>` must be green.
-9. **Present the decision brief** in your message, not a file: the goal in one
-   sentence and how the hill measures it; leaks you closed, one line each; each
-   gap you measured with its options and your recommendation; and what you read
-   of any private data - headers only, to confirm format, and say so.
-10. **The human runs `hills commit <name> -m "..."`.** Not you. Do not offer, and
+   Recommend the smallest response the user's goal survives, and propose better
+   ones than these when the task offers them, such as randomizing the instance so
+   a precomputed answer does not transfer. Changing the task is a proposal you
+   argue for, never your default: a toy problem with a closed-form shortcut is
+   often exactly what someone wants for a first run.
+8. **Measure what the hill can resolve.** Score the example submission twice,
+   three times if it is cheap. The value is the baseline, so the user knows what
+   "improve" means; the spread is the smallest gain this hill can tell from
+   noise. A hill whose spread is wider than the gains anyone expects cannot do
+   its job however honest it is, and this is the moment to say so.
+9. **Check.** `hills check <name>` must be green.
+10. **Present the decision brief** in your message, not a file: the goal in one
+    sentence and how the hill measures it; leaks you closed, one line each; each
+    gap you measured with its options and your recommendation; the baseline and
+    the spread; and what you read of any private data - headers only, to confirm
+    format, and say so.
+11. **The human runs `hills commit <name> -m "..."`.** Not you. Do not offer, and
     do not read "looks good" as permission. The agent that wrote the evaluator
     does not freeze it.
 
 ## Phase 4: the experiment loop (autonomous, does not stop)
 
 If you authored the hill in this context you have seen the evaluator internals
-and the private layout, so delegate this phase to a fresh subagent whose prompt
-carries **only the hill name and the user's goal**. Without subagents, tell the
-user to clear the session first.
+and the private layout, so delegate this phase to a fresh subagent. Its prompt
+carries the hill name, the user's goal, the stopping criteria, and an instruction
+to load this skill and follow `references/climbing.md`. Nothing about your
+authoring work, nothing about what is in `private/`, no hints about what you
+think will work. Without subagents, tell the user to clear the session first.
 
-Start with `hills describe <name>`, then read `references/climbing.md`, which
-carries the loop in full. In short: one idea into the in-scope files, commit,
-`hills eval . -H <name>`, read `passed`, `metrics`, `config` and `details`,
-record why you decided what you decided, repeat. Work on branch `hills/<name>`,
-one commit per experiment, prefixed `hills/<name>: <what changed>`. Uncommitted
-work comes back `+dirty` and two attempts become indistinguishable later. Dev
-runs are **unofficial** and must be labeled that way every time you mention one.
-
-**Never `reset --hard` a discarded experiment.** Reports record `submission_git`
-as `branch@short-sha`; discarding the commit leaves a signed score pointing at a
-sha nobody can check out. Keep history linear and complete; when an experiment is
-worse, the next commit reverts the in-scope files as part of its own change.
-
-**Simplicity.** All else equal, simpler wins. A 0.1% gain for fifty lines of hack
-is probably not worth it; a 0.1% gain from deleting code is.
+`references/climbing.md` carries the loop: score the baseline, then one idea per
+commit on branch `hills/<name>`, `hills eval`, read the report, decide, repeat.
+Read it before the first edit. All else equal, simpler wins: a 0.1% gain for
+fifty lines of hack is probably not worth it, a 0.1% gain from deleting code is.
 
 **Do not stop.** Never pause to ask "should I keep going?". The user may be
 asleep; run until the phase 2 stopping criteria are met or you are interrupted. A
@@ -207,8 +211,19 @@ about how well things are going.
 - Never edit a hill while climbing it. If the evaluator looks wrong, stop and say
   why; a changed hill has a different tree hash, so your score stops being
   comparable to anything before it.
-- Never read `private/` while climbing, including to check a file format.
+- Never read `private/` while climbing, including to check a file format. What
+  keeps you out is convention and the tool not handing you the path, so crossing
+  the boundary is not a technicality.
 - Never re-implement the metric in your submission and report its output.
+- A best result over repeated attempts is an order statistic, not a measurement.
+  Re-scoring unchanged code, or keeping the best of several evaluations of one
+  artifact, raises the reported number without raising the real one. If you
+  evaluate one submission more than once, report the spread rather than the
+  better draw, and treat a difference inside that spread as no difference.
+- Your submission writes inside its own workspace only. Never install into or
+  write into the hill's environment or `~/.autolab`: environments are cached per
+  hill version, so anything left there runs on every later evaluation of that
+  version.
 - `--final` is for the final claim. Running it repeatedly and keeping the best
   turns the test split into a validation split, and the hill stops measuring
   what it was built to measure.

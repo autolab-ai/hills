@@ -83,7 +83,10 @@ what you think it is. Turn expensive params down so `hills check` stays fast.
 Before showing the user anything, try to beat the hill you just wrote. What you
 find sorts into two piles, and they are handled differently.
 
-**Plumbing leaks** have a right answer, so close them and move on:
+**Plumbing leaks** have a right answer, so close them and move on. Each one is
+either the evaluator trusting a number the submission produced, or information
+travelling outward from `private/`. These six recur, and the pair of principles
+is what you check the seventh against:
 
 | leak | what it looks like | how to close it |
 |---|---|---|
@@ -107,6 +110,17 @@ size, and the responses from the SKILL with what each costs, and recommend the
 smallest one the goal survives. A toy problem with a known shortcut is often
 exactly what the user wants for a first run.
 
+## What the hill can resolve
+
+An honest hill that cannot detect the improvement anyone hopes for is still a bad
+hill. Score the example submission twice, three times if it is cheap, and you
+have both numbers: the baseline, which is what "improve" is measured against, and
+the spread, which is the smallest gain this hill can tell from noise. Report both
+in the brief, and if the spread is wider than the gains the user expects, say so
+before anything is frozen; the usual fixes are averaging over more cases or seeds
+inside the evaluator, or fixing whatever varies between runs. Repeating the
+evaluation also runs the loop end to end while the hill is still editable.
+
 ## When to propose more than one hill
 
 If the user's goals genuinely decompose into distinct objectives, such as quality
@@ -118,13 +132,16 @@ stated. Two concrete proposals, not an open-ended menu.
 
 The brief goes in your message, not in a file. Open it with the goal in one
 sentence and how the hill measures it, so the user can correct your reading
-before reading anything else. Its last section is the one that matters: each gap
-you measured, presented as the user's decision with concrete options and your
-recommendation.
+before reading anything else. Give the baseline and the spread, so they know what
+"improve" means here and how small a gain this hill can still see. Its last
+section is the one that matters: each gap you measured, presented as the user's
+decision with concrete options and your recommendation.
 
 Then stop. The human runs `hills commit`. After it lands, ask two things: proceed
 to climbing, and what the stopping criteria are. On yes, delegate phase 4 to a
-fresh subagent whose prompt contains only the hill name and the user's goal. No
-summary of your authoring work, no mention of what is in `private/`, no hints
-about what you think will work. Your context has seen the evaluator's internals;
-the climbing context must not inherit that.
+fresh subagent. Its prompt carries the hill name, the user's goal, the stopping
+criteria, and an instruction to load the hills skill and follow
+`references/climbing.md`. Nothing else: no summary of your authoring work, no
+mention of what is in `private/`, no hints about what you think will work. Your
+context has seen the evaluator's internals; the climbing context must not inherit
+that.
