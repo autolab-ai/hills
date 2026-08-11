@@ -1,9 +1,10 @@
 <h1 align="center">hills</h1>
 
-<p align="center"><strong>Let an agent run your optimization loop, without letting it grade its own work</strong></p>
+<p align="center"><strong>Design the evaluation once, let the agent optimize for days, trust the number you come back to</strong></p>
 
 <p align="center">
   <a href="#quickstart">Quickstart</a> ·
+  <a href="#running-a-loop-you-are-not-watching">Running a loop you are not watching</a> ·
   <a href="#what-a-hill-is">What a hill is</a> ·
   <a href="#how-it-stays-honest">How it stays honest</a> ·
   <a href="#reference">Reference</a> ·
@@ -16,10 +17,12 @@
   <img alt="Python 3.11+" src="https://img.shields.io/badge/python-3.11+-7fa846?style=flat-square&labelColor=1c1c1c">
 </p>
 
-> When you use an agent to run an iterative optimization loop, the same model
-> writes the code, runs the evaluation, and tells you the score. It grades its
-> own homework, so the numbers cannot be trusted. **hills splits those two jobs
-> apart.**
+> You leave an agent optimizing overnight, or for three days, and come back to a
+> number. You were not watching, and the same model wrote the code, ran the
+> evaluation and decided what the result was. It may have edited the evaluation,
+> optimized a proxy that came apart from your goal, or reported something it
+> never measured. Working out which of those happened takes about as long as the
+> run did.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/autolab-ai/hills/main/docs/banner.png"
@@ -27,15 +30,22 @@
        width="900">
 </p>
 
-You package the evaluation into a **hill**: a folder holding the task
-description, the scoring code, and any data the agent must not see. You freeze
-it. From then on the agent can write whatever code it likes, but a score exists
-only if `hills eval` produced it, and every score comes back signed and tied to
-the exact version of the evaluator that produced it.
+hills is a way of setting those runs up so the number survives the wait. You put
+the evaluation into a **hill**: a folder holding the task description, the
+scoring code, and any data the agent must not see. You spend real time on it,
+because it is the one artifact that decides whether days of compute produced
+anything. Then you freeze it.
 
-A hill is a versioned folder: `hills commit` freezes it, and every score is
-pinned to the version that produced it. Change the evaluator and you get a new
-version with a fresh history, because a changed evaluator is a different game.
+After that the separation is hard. The agent edits its own code freely. It
+cannot edit the evaluation, cannot read the held-out data, and cannot produce a
+score by any route except running the frozen evaluator, which signs every report
+with a key the agent cannot read.
+
+So the agent is free to hallucinate, take wrong turns, write bad code and try to
+game the metric. None of that reaches the score, and none of it needs your
+attention while the loop is running. Every score is tied to the exact version of
+the evaluation that produced it, and changing the evaluation starts a fresh
+history, because it is a different measurement.
 
 <a id="quickstart"></a>
 
@@ -189,6 +199,30 @@ and `hills examples` lists the examples you can start from, such as
 `nanogpt-10min`: a timed training run scored on a held-out split the agent
 never sees.
 
+<a id="running-a-loop-you-are-not-watching"></a>
+
+## Running a loop you are not watching
+
+Most of the human effort in a long optimization run goes into watching it:
+checking in, reading logs, deciding whether the last number was real. hills moves
+that effort to the front, and the run itself needs none of it.
+
+1. **Decide what better means, before anything starts.** The metric is a proxy
+   for a goal, and an agent optimizing a proxy will find whatever the proxy
+   failed to say. This is the only part of the run where your time compounds, so
+   it is worth an hour of argument with yourself about where the metric and the
+   goal come apart.
+2. **Draw the line explicitly.** Which files the agent may change, which code
+   does the measuring, what it never sees, and what would count as cheating.
+   `hills commit` freezes that division, and you run it, not the agent.
+3. **Then stop supervising.** Hours or days, unattended. Nothing the agent does
+   can change what better means, so there is no drift to catch and no interim
+   number to sanity-check.
+
+What comes back is a score, the version of the evaluation that produced it, and a
+signature over both. If you distrust it later, you can re-run it, because the
+hill is inspectable and the submission was hashed.
+
 ## What a hill is
 
 A folder, versioned by its own private git repository:
@@ -281,9 +315,10 @@ the break rather than quietly hiding it.
 
 ### Trust posture
 
-This tool defends against **fooling yourself**: an agent loop that grades its own
-work, edits its own scores, or lets the definition of the metric drift while it
-optimizes - usually by accident, which is what makes it hard to catch.
+This tool defends against **fooling yourself**: a long unattended run whose
+definition of better drifted while you were away, or that scored itself, or that
+reported a number nothing independent ever measured - usually by accident, which
+is what makes it hard to catch afterwards.
 
 It does not stop a determined human. Files under `private/` are ordinary files;
 nothing but convention keeps you out of them. Signed scores show tampering, they
@@ -322,9 +357,9 @@ It runs in four phases.
    nothing else, then loops: edit, commit, dev-run, `hills eval`, decide. It does
    not stop to ask permission, and it runs until your stopping criteria are met.
 
-The third phase is the one a self-graded loop skips, and it is the reason the
-numbers at the end mean something. Total human surface: one install, one commit,
-one "proceed" with stopping criteria.
+Phases 2 and 3 are where your attention goes, and an hour spent there is what
+makes phase 4 safe to leave alone for days. Total human surface: one install, one
+commit, one "proceed" with stopping criteria.
 
 ## Reference
 
