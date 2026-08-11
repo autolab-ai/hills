@@ -25,26 +25,22 @@
        width="900">
 </p>
 
-hills is a way of setting those runs up so the number survives the wait. You put
-the evaluation into a **hill**: a folder holding the task description, the
-scoring code, and any data the agent must not see. You spend real time on it,
-because it is the one artifact that decides whether days of compute produced
-anything. Then you freeze it.
+Hills are designed to make it harder for the agent to reward hack your
+optimization objective.
 
-After that the separation is hard. The agent edits its own code freely. It
-cannot edit the evaluation, cannot read the held-out data, and cannot produce a
-score by any route except running the frozen evaluator, which signs every report
-with a key the agent cannot read.
+Hills put an immutable wall between the evaluation code and the optimizable
+code. You write the evaluation and the data it scores against, then freeze it
+into a **hill**. From then on the agent changes its own code and nothing else:
+it cannot edit the evaluation, cannot read the held-out data, and cannot produce
+a score except by running the frozen evaluator, which signs every result with a
+key the agent cannot read.
 
-So the agent is free to hallucinate, take wrong turns, write bad code and try to
-game the metric. None of that reaches the score, and none of it needs your
-attention while the loop is running. Every score is tied to the exact version of
-the evaluation that produced it, and changing the evaluation starts a fresh
-history, because it is a different measurement.
+Changing the evaluation mid-optimization will be immediately visible due to the
+version control of the hills.
 
 <a id="quickstart"></a>
 
-## 🧑‍💻 Quickstart
+## 🧑‍💻 Quickstart for humans
 
 Install the skill. It bootstraps the CLI itself on first use, so this is the
 only command you run.
@@ -66,7 +62,7 @@ your stopping criteria are met.
 That one command is deliberate. The agent that wrote the evaluator does not get
 to freeze it.
 
-## 🤖 Quickstart
+## 🤖 Quickstart for agents
 
 Two minutes, no GPU, no network after install. We will create the hello-world
 hill, freeze it, score a submission against it, and then show what happens when
