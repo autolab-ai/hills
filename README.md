@@ -331,26 +331,42 @@ It runs in four phases.
 
 1. **Confirm the project.** A minute, no more. What is this, and is it what you
    want to optimize?
-2. **Agree on a plan.** What the number stands in for, goal and direction, files
-   in scope, files that are read-only, what is held out, the constraint that
-   makes runs comparable, the ways the number could move without the work being
-   done, the run command, and when to stop. You confirm or edit it before
-   anything is built.
-3. **Build and freeze the hill.** The plan becomes a hill: read-only files are
-   frozen into it, held-out data moves into `private/`, and the scoring code is
-   copied rather than imported so it cannot drift with your project. The agent
-   then tries to beat its own draft, and presents a brief: the leaks it closed,
-   and any gap it measured between the metric and what you actually want, with
-   options from a sentence in the README up to changing the task. Which one you
-   take is your call. **You** run `hills commit`. The agent that wrote the
-   evaluator does not get to freeze it.
+2. **Agree on a plan.** What the number stands in for, which files the agent may
+   edit and what it may change inside them, which files define the metric and are
+   therefore frozen, what is held out, the constraint that makes runs comparable,
+   the ways the number could move without the work being done, and when to stop.
+   This is the one place your attention is worth anything, and it is the only
+   place you are asked to agree to something.
+3. **Build and freeze the hill.** The plan becomes a hill: the frozen files move
+   into it, held-out data into `private/`, and the scoring code is copied rather
+   than imported so it cannot drift with your project. The agent tries to beat
+   its own draft, reports the leaks it closed and any gap it measured between the
+   metric and what you actually want, then commits and starts climbing.
 4. **The experiment loop.** A fresh subagent starts from `hills describe` and
-   nothing else, then loops: edit, commit, dev-run, `hills eval`, decide. It does
-   not stop to ask permission, and it runs until your stopping criteria are met.
+   nothing else, then loops: edit, commit, `hills eval`, decide. It does not stop
+   to ask permission, and it runs until your stopping criteria are met.
 
-Phases 2 and 3 are where your attention goes, and an hour spent there is what
-makes phase 4 safe to leave alone for days. Total human surface: one install, one
-commit, one "proceed" with stopping criteria.
+An hour spent on phase 2 is what makes phase 4 safe to leave alone for days.
+Total human surface: one install and one conversation about the plan.
+
+### What you come back to
+
+The agent keeps `journal.html` current in the same commit as every experiment, so
+an interrupted run still leaves a readable page:
+
+```
+journal.html          where things stand, the metric over time, what was tried
+reports/
+  001-baseline.json   the signed report behind each row
+  002-lp-polish.json
+```
+
+Open it whenever you like without interrupting anything. The agent decides what
+belongs on the page, which is the point: after forty attempts it is the only one
+that knows which three were the same idea and which dead end is worth not
+repeating. Every scored row links to the signed report behind it, so a number you
+doubt is one click from `hills verify`, and the dead ends stay on the page with
+the reason they died.
 
 ## Reference
 
@@ -418,7 +434,7 @@ If you find this repo useful, please cite it:
   author       = {Lukoianov, Artem and Klein, Serge and Didenko, Serge},
   organization = {Autolab},
   year         = {2026},
-  version      = {0.1.5},
+  version      = {0.1.6},
   url          = {https://github.com/autolab-ai/hills}
 }
 ```

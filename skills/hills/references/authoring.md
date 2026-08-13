@@ -137,9 +137,11 @@ before reading anything else. Give the baseline and the spread, so they know wha
 section is the one that matters: each gap you measured, presented as the user's
 decision with concrete options and your recommendation.
 
-Then stop. The human runs `hills commit`. After it lands, ask two things: proceed
-to climbing, and what the stopping criteria are. On yes, delegate phase 4 to a
-fresh subagent. Its prompt carries the hill name, the user's goal, the stopping
+Then commit it yourself and go. The user agreed the plan already; the brief
+reports what you built rather than asking a second time. Ask only if a gap you
+measured has an answer that is genuinely theirs, and ask it with options rather
+than open text. If the stopping criteria were not settled in phase 2, that is
+the one thing still worth a question. Then delegate phase 4 to a fresh subagent. Its prompt carries the hill name, the user's goal, the stopping
 criteria, and an instruction to load the hills skill and follow
 `references/climbing.md`. Nothing else: no summary of your authoring work, no
 mention of what is in `private/`, no hints about what you think will work. Your

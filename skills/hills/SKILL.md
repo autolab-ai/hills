@@ -26,8 +26,61 @@ produced it, and every report comes back signed and tied to the exact version of
 the evaluator that produced it.
 
 Four phases: confirm the project, agree a plan, build and freeze the hill, run
-the loop. One human touchpoint, at the end of phase 3; after it you do not ask
-permission again.
+the loop. One human touchpoint, at the end of phase 2, where they agree the plan.
+After that you build, freeze, commit and climb without asking again.
+
+You leave one artifact the user can open at any time without interrupting you:
+`journal.html`, a page you write and keep current, backed by the signed report
+from every run. It is specified below. It is how someone who walked away for six
+hours finds out what happened, so it is not optional and not a summary you write
+at the end.
+
+## Asking the user things
+
+When you need a decision, offer concrete options, not an open question. "Anything
+you want changed?" makes the user do the work of inventing alternatives you have
+already thought about. If your harness has a multiple-choice question tool, use
+it: two to four options, each with what it costs, your recommendation first and
+labeled. Free text is the fallback, not the default.
+
+This applies to the plan in phase 2, to every gap you measure in phase 3, and to
+anything else where you can name the alternatives. It does not apply to "go or
+not go", which is one question with an obvious shape.
+
+**Ask in their words, about their thing.** The user knows their project. They do
+not know this tool's vocabulary and should never need it to answer you. Say
+"sampler", "learning rate", "the tokenizer", never "the boundary", "the design",
+"the primary config entry". Name the concrete thing you are asking about, and
+state each option as what would be true afterwards, not as the name of a design
+you have in your head. A question that only makes sense to someone who has read
+this file is a broken question.
+
+This one was asked in a real run and is the failure to avoid:
+
+> The evaluator-drives-the-sampler design blocks the closed-form shortcut but
+> locks the sampler family. Which boundary do you want?
+>   1. Evaluator drives sampling
+>   2. Submission samples, evaluator supplies noise + K
+>   3. Let the shortcut exist, flag it
+
+The user has to reverse-engineer three architectures to answer. The same decision
+in their terms:
+
+> Should the sampler be something the agent can change, or fixed as part of the
+> evaluation?
+>   1. Fix the sampler. Every run is scored on the same sampling procedure, so
+>      any improvement has to come from the model itself. Rules out one way of
+>      scoring well without training a better model.
+>   2. Let the agent change it. A bigger search space, and a faster sampler is a
+>      real result. But then a run can win by changing how you sample rather than
+>      what you learned, and the numbers answer a different question.
+
+Same decision, no jargon, and the consequence is in the option rather than in a
+sentence above it.
+
+Ask one question at a time when the answers depend on each other, and keep any
+preview short enough to read in a narrow column: a few lines of what the file
+would look like, not a code listing that wraps.
 
 Everything before the iron rules is guidance, and you know your task better than
 this file does: its lists are the cases that recur, not the cases that exist. The
@@ -65,10 +118,17 @@ benchmark other people will run deserves twenty.
 - **Goal.** What number, up or down, and what it stands in for. If they name
   several, say which is primary; the rest become secondary metrics that break
   ties.
-- **In-scope files.** What you may edit each iteration; this becomes the submission.
-- **Read-only files.** The harness, data prep, fixtures, scoring code. Anything
-  that defines what the metric means; this gets frozen into the hill and you
-  cannot edit it from phase 3 on.
+- **The optimization space.** Every file the climber may edit, and what it is
+  free to change inside them: architecture, optimizer, hyperparameters, batch
+  size, kernels, and so on. Say it as permissively as the task allows, because
+  this is the search space and a needlessly narrow one is a worse run.
+- **The eval space.** Everything that defines what the number means: the harness,
+  data prep, fixtures, scoring code, the held-out split. This gets frozen into
+  the hill and nothing in phase 4 may touch it.
+- **The boundary between them.** Draw it explicitly and write it down, because it
+  is the whole design. Anything you leave unassigned will be assigned by the
+  climber, in its own favour, at three in the morning. Also settle what it may
+  not do at all: add dependencies, reach outside its workspace, call the network.
 - **What is held out.** What you may train or tune on, what the score is computed
   on, and whether a separate test split exists for the final claim. Held-out data
   moves into `private/` and never enters git.
@@ -109,8 +169,12 @@ become checks in the evaluator or reported config; held-out data moves to
    read everything else including `eval.py`: knowing how you are scored is fine,
    knowing the answers is not.
 4. **Write `README.md` as the contract.** The only thing the climbing context
-   reads: the task and what it stands in for, submission format, how the metric
-   is computed, params, and a short "what the evaluator will not do".
+   reads, so the boundary you drew in phase 2 has to be in it, in full: the files
+   the climber may edit and what it may change inside them, what is frozen, and
+   what it may not do at all. Then the task and what it stands in for, submission
+   format, how the metric is computed, params, and a short "what the evaluator
+   will not do". The climber gets its search space from this file and nowhere
+   else, so anything you leave out is not a rule.
 5. **Write an example submission and tests.** `examples/` proves the format;
    `tests/` stops the evaluator drifting. `from hills import run_evaluator` makes
    a test three lines; turn expensive params down there.
@@ -153,9 +217,12 @@ become checks in the evaluator or reported config; held-out data moves to
     gap you measured with its options and your recommendation; the baseline and
     the spread; and what you read of any private data - headers only, to confirm
     format, and say so.
-11. **The human runs `hills commit <name> -m "..."`.** Not you. Do not offer, and
-    do not read "looks good" as permission. The agent that wrote the evaluator
-    does not freeze it.
+11. **Commit it, open the journal, start climbing.** `hills commit <name> -m
+    "..."`, then write `journal.html` with the plan and an empty results table and
+    show the user where it is, then go. The user already agreed the plan in phase
+    2; the brief is you reporting what you built, not asking a second time. If the
+    brief surfaced a gap whose answer is genuinely theirs, ask that one question
+    with options and wait. Otherwise all three happen in the same turn.
 
 ## Phase 4: the experiment loop (autonomous, does not stop)
 
@@ -179,6 +246,104 @@ something more radical, chase papers referenced in comments, try removing things
 When the criteria are met, `hills eval <best> -H <name> --final` is the claim,
 and the attempts table is the report.
 
+## The report you leave behind
+
+The user is not watching. What they get instead is `journal.html` at the root of
+the branch you work on, alongside a `reports/` directory holding the signed
+report from every scored run.
+
+```
+journal.html                     you write this, you decide what is in it
+reports/
+  001-baseline.json              hills eval ... -o reports/001-baseline.json
+  002-lp-polish.json
+  ...
+```
+
+`hills eval` already takes `-o`, so writing the report there costs nothing:
+
+```bash
+hills eval <dir> -H <name> -o reports/012-basin-hopping.json > /dev/null
+```
+
+**Create it before the first evaluation, not after.** The moment the hill is
+committed, or if you were handed a hill, before you score the baseline: write the
+page with the plan, the goal, the stopping criteria and an empty results table,
+then show the user where it is. A page that appears only once there are results
+is a page they did not know to look at while the run was going. This is the last
+thing you do before the loop starts and the first thing you do if the loop is
+all you were asked for.
+
+Surface it so it cannot be missed. Not a path buried in a paragraph: its own
+line, with the command to open it, and say plainly that it stays current while
+you work and they can look whenever without interrupting anything.
+
+**You decide what goes in the page.** That is the point of it, and it is a real
+piece of work rather than a log dump. You are the only one who knows which of
+forty attempts mattered, which three were the same idea, and which dead end is
+worth someone else not repeating. Write the page you would want to be handed
+after sleeping through the run.
+
+What it needs to do, however you choose to do it:
+
+- Answer "where are we" in the first screen, without scrolling. Phase, iteration
+  count, baseline, current best, and whether the loop is still running.
+- Show the metric over time, so a plateau or a jump is visible rather than
+  inferred. An inline SVG is enough; do not reach for a chart library.
+- Give each scored run a row, and **link the row to its report** in `reports/`,
+  so a number is one click from the signature that backs it. Show enough of the
+  signature to be checkable, and say that `hills verify <file>` checks it.
+- Carry the ideas: what is running, what is queued, what was ruled out and why.
+  Killed ideas earn their place, because the list of what does not work is half
+  of what a run produces.
+- Separate official scores from your own dev numbers, visibly. Anything that did
+  not come from a report is unofficial and has to look unofficial.
+
+Two constraints. Keep it **self-contained**: no CDN, no external fonts, no
+network at open time, because it will be opened on a laptop that is not this
+machine. And rewrite it **in the same commit as the experiment**, never in a
+batch at the end, so an interrupted run still leaves a current page.
+
+Record the failures too. A page with the crashes and the regressions removed
+reads as a clean run, which is the opposite of what it is for.
+
+**Tell the user where it is.** Print the path when you first create it, and again
+whenever you report progress, in a form they can paste:
+
+```
+open journal.html
+```
+
+## Changing the evaluation after it is frozen
+
+Sometimes phase 4 shows the hill is wrong: the metric does not measure the goal,
+a leak you missed, an evaluator bug. Fix it. You do not need permission.
+
+1. Stop climbing. Do not keep scoring against an evaluator you believe is broken.
+2. Change the hill, `hills check`, and `hills commit` a new version.
+3. Put it in `journal.html` where it cannot be missed, at the top, breaking the
+   metric chart into a before and an after rather than drawing one line across
+   the change:
+
+```markdown
+EVALUATION CHANGED  2026-08-12T15:40:02Z
+Was:      tree hash a7f3e921, baseline 2.5414
+Now:      tree hash 4c81b7d0, baseline 2.5390
+Why:      the tolerance let a packing overlap by 1e-8 and still pass
+Effect:   scores before this point are not comparable to scores after it
+```
+
+4. Re-establish the baseline on the new hill and carry on.
+
+The tool already enforces the consequence: a new tree hash starts a fresh
+attempts history, so old and new scores cannot silently mix. Your job is to make
+it legible, and to say it plainly in the final report rather than presenting one
+continuous line of numbers that crossed a change of ruler. Tell the user next
+time you speak; do not wait for them to ask.
+
+If you are the climbing subagent, you cannot do this: you have not seen the hill
+and are not supposed to. Stop, say what looks wrong, and hand it back.
+
 ## Operating on an existing hill
 
 | the user wants | do this |
@@ -189,12 +354,12 @@ and the attempts table is the report.
 | see what has been tried | `hills attempts <name>` |
 | check a report is genuine | `hills verify <report.json>` |
 | see a hill's version history | `hills log <name>` |
-| change a hill | a miniature phase 2 and 3, never your own initiative |
+| change a hill | a miniature phase 2 and 3; see "Changing the evaluation" above |
 
 `hills eval` refuses a dirty hill; while authoring, `--current` scores a draft
-evaluator unofficially, with `tree_hash: null`. The human commits again,
-producing a new tree hash and a fresh attempts history, because a changed
-evaluator is a new game.
+evaluator unofficially, with `tree_hash: null`. Committing again produces a new
+tree hash and a fresh attempts history, because a changed evaluator is a new
+game.
 
 Depth in `references/`: `authoring.md` for phases 2 and 3, `climbing.md` for
 phase 4, `cli.md` for commands and errors.
@@ -208,9 +373,11 @@ about how well things are going.
   label it unofficial every time.
 - Never edit a report file. Reports are signed, `hills verify` catches edits, and
   an edited report is worth less than no report.
-- Never edit a hill while climbing it. If the evaluator looks wrong, stop and say
-  why; a changed hill has a different tree hash, so your score stops being
-  comparable to anything before it.
+- Never edit a hill mid-climb to keep climbing. If the evaluator looks wrong,
+  stop, fix it, commit a new version, and record the change in `journal.html`
+  before scoring again. Editing an evaluator while a loop runs against it, or
+  carrying scores across the change as one series, is the failure this tool
+  exists to prevent.
 - Never read `private/` while climbing, including to check a file format. What
   keeps you out is convention and the tool not handing you the path, so crossing
   the boundary is not a technicality.

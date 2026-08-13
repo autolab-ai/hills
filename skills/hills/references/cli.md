@@ -47,7 +47,7 @@ A private file or lock-tracked blob no longer matches `private.lock` or
 frozen with is not the data on disk. Restore the file or re-commit the hill.
 
 **`hill <name> has no commits yet`**
-The hill was scaffolded but never frozen. A human runs `hills commit`.
+The hill was scaffolded but never frozen. Run `hills commit`.
 
 **`device gpu:0 is busy with another official eval`**
 Another official eval holds the device. Wait, or re-run with `--queue`.
