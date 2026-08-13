@@ -15,6 +15,7 @@
 <p align="center">
   <img alt="MIT license" src="https://img.shields.io/badge/license-MIT-7fa846?style=flat-square&labelColor=1c1c1c">
   <img alt="Python 3.11+" src="https://img.shields.io/badge/python-3.11+-7fa846?style=flat-square&labelColor=1c1c1c">
+  <a href="https://discord.gg/2ZVZmE8Ppb"><img alt="Discord" src="https://img.shields.io/badge/discord-join%20the%20community-7fa846?style=flat-square&labelColor=1c1c1c"></a>
 </p>
 
 > Your new job is to write agentic loops. Hills allows you to create an environment you trust and let the agent optimize against it without your supervision.
@@ -434,7 +435,7 @@ If you find this repo useful, please cite it:
   author       = {Lukoianov, Artem and Klein, Serge and Didenko, Serge},
   organization = {Autolab},
   year         = {2026},
-  version      = {0.1.6},
+  version      = {0.1.7},
   url          = {https://github.com/autolab-ai/hills}
 }
 ```

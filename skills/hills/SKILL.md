@@ -82,6 +82,30 @@ Ask one question at a time when the answers depend on each other, and keep any
 preview short enough to read in a narrow column: a few lines of what the file
 would look like, not a code listing that wraps.
 
+## Where the runs happen
+
+Ask this early, whether you are building a hill or climbing one someone else
+built, and ask it before anything long starts. "Where should these run?" with the
+machines you can actually see, and local always on the list:
+
+```bash
+grep -E "^Host " ~/.ssh/config | awk '{print $2}'    # candidates, if the file exists
+```
+
+Offer those plus local, and let them name something you did not find. If the task
+needs a GPU and this machine has none, say so rather than discovering it at the
+first evaluation.
+
+If they pick a remote host, check before committing to it: `hills --version`
+there, the project and any data present, and whether the hill's dependencies
+install. Sorting that out now costs a minute; finding it at 2am costs the night.
+
+One hills-specific consequence worth telling them: hardware usually lands in the
+report as a **primary** config entry, so a score from one machine and a score
+from another do not rank against each other. Moving mid-run does not corrupt
+anything, it splits the results into two groups that cannot be compared. Pick the
+machine you want the final number to come from, and stay on it.
+
 Everything before the iron rules is guidance, and you know your task better than
 this file does: its lists are the cases that recur, not the cases that exist. The
 iron rules are the opposite. They hold however well the run is going, because an
@@ -136,6 +160,7 @@ benchmark other people will run deserves twenty.
   comparable: wall-clock per run, step or epoch count, token or API budget, a
   fixed dataset. Propose the one that fits. Say now if the metric is a physical
   measurement, because the hill will then serialize runs on the device.
+- **Where the runs happen.** Ask, do not assume. See below.
 - **Soft constraints.** VRAM, latency, cost, model size; what should not blow up
   while you chase the metric.
 - **Ways to move the number without doing the work.** Editing the evaluator,
@@ -288,6 +313,16 @@ What it needs to do, however you choose to do it:
 
 - Answer "where are we" in the first screen, without scrolling. Phase, iteration
   count, baseline, current best, and whether the loop is still running.
+- **Say what is being measured, in a paragraph anyone can read.** What the number
+  is, which direction is better, what it stands in for, what the submission has
+  to produce, what is held out, and which machine the runs are on. Whoever opens
+  this page may not have been in the conversation where the hill was designed,
+  and may not know what a hill is. Do not make them read `eval.py` to find out
+  what the score means.
+- **Flag any change to the hill, unmissably.** If the evaluation was re-committed
+  mid-run, that belongs at the top with the old and new tree hash, not buried in
+  a row. Break the chart at the change rather than drawing one line across it,
+  and say plainly that numbers on either side are not comparable.
 - Show the metric over time, so a plateau or a jump is visible rather than
   inferred. An inline SVG is enough; do not reach for a chart library.
 - Give each scored run a row, and **link the row to its report** in `reports/`,

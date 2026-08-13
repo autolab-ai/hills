@@ -26,6 +26,11 @@ data is not.
 them.** That boundary was decided when the hill was built and it is not
 yours to widen. Anything it does not grant you, you do not have.
 
+**Confirm where the runs happen before the first one.** If it was not settled
+when you were handed the task, ask, offering the hosts in `~/.ssh/config` and
+local. Hardware is usually a primary config entry, so switching machines partway
+splits your results into two groups that do not rank against each other.
+
 **Write `journal.html` before you score anything.** If a hill was handed to you,
 this is your first action, ahead of the baseline: the goal, the stopping
 criteria, the plan you intend to try, and an empty results table. Then tell the
