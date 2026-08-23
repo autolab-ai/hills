@@ -31,3 +31,7 @@ class EvaluatorFailed(HillsError):
 
 class DeviceBusy(HillsError):
     pass
+
+
+class BundleError(HillsError):
+    """A bundle file is malformed, unsafe, or does not verify against its manifest."""

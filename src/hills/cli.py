@@ -6,6 +6,7 @@ from pathlib import Path
 
 from hills import (
     __version__,
+    bundles,
     check as check_mod,
     locks,
     paths,
@@ -372,6 +373,44 @@ def cmd_setup(args) -> int:
     return 0
 
 
+def cmd_bundle(args) -> int:
+    hill = Hill.resolve(args.name)
+    manifest, output = bundles.bundle(
+        hill,
+        output=Path(args.out) if args.out else None,
+        include_private=not args.no_private,
+        force=args.force,
+    )
+    private = [f for f in manifest.files if f.kind == bundles.KIND_PRIVATE]
+    blobs = [f for f in manifest.files if f.kind == bundles.KIND_BLOB]
+    out(f"bundled {manifest.hill} {manifest.version}")
+    out(f"  tree hash  {manifest.tree_hash}")
+    out(f"  commit     {manifest.commit}")
+    out(f"  private    {len(private)} file(s), {sum(f.size for f in private):,} bytes"
+        + ("" if manifest.private_included else "  (omitted: --no-private)"))
+    out(f"  blobs      {len(blobs)} file(s), {sum(f.size for f in blobs):,} bytes")
+    out(f"  wrote      {output}")
+    if args.json:
+        print(dumps(manifest.as_json()))
+    return 0
+
+
+def cmd_unbundle(args) -> int:
+    manifest, dest = bundles.unbundle(
+        Path(args.file), into=Path(args.into) if args.into else None, force=args.force
+    )
+    out(f"unbundled {manifest.hill} {manifest.version}")
+    out(f"  tree hash  {manifest.tree_hash}")
+    out(f"  path       {dest}")
+    if not manifest.private_included:
+        out("")
+        out("warning: this bundle was made with --no-private. The hill cannot be evaluated "
+            "until private/ is supplied and matches private.lock.")
+    if args.json:
+        print(dumps({**manifest.as_json(), "path": str(dest)}))
+    return 0
+
+
 def cmd_home(args) -> int:
     root = paths.home()
     out(f"{root}")
@@ -464,6 +503,19 @@ def build_parser() -> argparse.ArgumentParser:
 
     examples = add("examples", "example hills bundled with the tool, usable with `hills new -t`")
     examples.set_defaults(func=cmd_examples)
+
+    bundle = add("bundle", "write a committed hill, with its private files and blobs, to one file")
+    bundle.add_argument("name")
+    bundle.add_argument("-o", "--out", help=f"output path (default: <name>-<tree_hash>{bundles.SUFFIX})")
+    bundle.add_argument("--no-private", action="store_true", help="omit private/ from the bundle")
+    bundle.add_argument("--force", action="store_true", help="bundle HEAD even though the hill is dirty")
+    bundle.set_defaults(func=cmd_bundle)
+
+    unbundle = add("unbundle", "unpack a bundle into a working hill and verify it")
+    unbundle.add_argument("file", help=f"a {bundles.SUFFIX} file")
+    unbundle.add_argument("--into", metavar="DIR", help="parent directory (default: .autolab/hills)")
+    unbundle.add_argument("--force", action="store_true", help="replace an existing hill directory")
+    unbundle.set_defaults(func=cmd_unbundle)
 
     home = add("home", "where machine state lives")
     home.set_defaults(func=cmd_home)

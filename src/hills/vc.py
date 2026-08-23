@@ -145,6 +145,21 @@ class VC:
         self.run("commit", "--quiet", "-m", message)
         return self.tree_hash()
 
+    def bundle_to(self, dest: Path) -> None:
+        """Write a `git bundle` holding the full history reachable from HEAD."""
+        self.run("bundle", "create", "--quiet", str(dest), "HEAD")
+
+    def restore_from_bundle(self, bundle: Path) -> None:
+        """Populate a freshly initialized .vc from a git bundle and check out its HEAD.
+
+        The bundle records HEAD as a ref, so fetching it recreates the history
+        exactly; the local branch is then pointed at that commit and checked
+        out into the work tree.
+        """
+        self.run("bundle", "verify", "--quiet", str(bundle))
+        self.run("fetch", "--quiet", str(bundle), "HEAD")
+        self.run("reset", "--quiet", "--hard", "FETCH_HEAD")
+
     def archive_to(self, dest: Path) -> None:
         """Extract the committed tree at HEAD into dest."""
         dest.mkdir(parents=True, exist_ok=True)

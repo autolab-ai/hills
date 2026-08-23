@@ -23,6 +23,8 @@ terminal.
 | `hills attempts <name>` | eval history for the current version |
 | `hills verify <report.json>` | check a report's signature |
 | `hills list` | the hills in this project |
+| `hills bundle <name> [-o <file>] [--no-private] [--force]` | write a committed hill, with `private/` and blobs, to one `.hill.tar` |
+| `hills unbundle <file> [--into <dir>] [--force]` | unpack a bundle into a verified hill with the same tree hash |
 | `hills setup` | install this skill into detected harnesses |
 | `hills examples` | the example hills bundled with the tool |
 | `hills home` | where machine state lives |

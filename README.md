@@ -385,6 +385,8 @@ the reason they died.
 | `hills attempts <name>` | eval history for this version; flags a broken chain |
 | `hills verify <report.json>` | check a report's signature |
 | `hills list` | the hills in this project |
+| `hills bundle <name>` | write a committed hill, with `private/` and blobs, to one `.hill.tar` |
+| `hills unbundle <file>` | unpack a bundle into a verified hill with the same tree hash |
 | `hills setup` | install the agent skill into detected harnesses |
 | `hills home` | where machine state lives |
 
@@ -435,7 +437,7 @@ If you find this repo useful, please cite it:
   author       = {Lukoianov, Artem and Klein, Serge and Didenko, Serge},
   organization = {Autolab},
   year         = {2026},
-  version      = {0.1.7},
+  version      = {0.2.0},
   url          = {https://github.com/autolab-ai/hills}
 }
 ```
