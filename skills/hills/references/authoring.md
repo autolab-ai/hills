@@ -35,7 +35,9 @@ by this, and it is what stops old scores from silently changing meaning.
 watchdog bound, typed params, blob rules, and `exclusive: gpu` when the metric is
 a physical measurement on shared hardware. Semantic limits belong in `eval.py`.
 `hills new` writes `spec_version` (the manifest contract version); you never
-change it.
+change it. It also declares `metrics` — name and direction, in ranking order —
+which every passing report must lead with; keep it, `eval.py`, and the README's
+metric table saying the same thing.
 
 **`eval.py`** is one function:
 

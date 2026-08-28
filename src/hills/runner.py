@@ -11,7 +11,7 @@ from pathlib import Path
 
 from hills import devlock, locks, paths, report as report_mod, state, uvenv
 from hills.canonical import dumps
-from hills.core_schema import validate_core
+from hills.core_schema import metrics_prefix_violation, validate_core
 from hills.errors import DirtyHill, EvaluatorFailed, HillsError
 from hills.hashing import SKIP_DIRS, SKIP_FILES, SKIP_SUFFIXES, hash_tree
 from hills.hill import Hill
@@ -212,7 +212,16 @@ def _run_evaluator(hill, hill_root, run_dir, submission, params, final, env_key,
     if "error" in payload:
         return None, "the evaluator raised:\n" + payload["error"]["traceback"].rstrip()
 
-    return validate_core(payload["result"]), None
+    core = validate_core(payload["result"])
+    if core["passed"] and hill.manifest.metrics:
+        declared = [metric.as_json() for metric in hill.manifest.metrics]
+        violation = metrics_prefix_violation(declared, core["metrics"])
+        if violation:
+            return None, (
+                "the evaluator's report does not match the metrics declared in "
+                "hill.yaml: " + violation
+            )
+    return core, None
 
 
 def _tail(text: str, lines: int = 40) -> str:

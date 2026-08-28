@@ -201,6 +201,8 @@ def cmd_describe(args) -> int:
         "files": hill.vc.ls_tree() if committed else [],
         "readme": readme,
     }
+    if hill.manifest.spec_version >= 2:
+        payload["metrics"] = [metric.as_json() for metric in hill.manifest.metrics]
     print(dumps(payload))
     return 0
 

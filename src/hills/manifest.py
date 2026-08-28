@@ -11,7 +11,7 @@ from hills.errors import ManifestError
 # The manifest contract this tool reads, named by `spec_version` in hill.yaml.
 # A spec version fixes the set of keys hill.yaml may contain and the evaluator
 # contract; changing either, even by adding an optional key, is a new version.
-SUPPORTED_SPEC_VERSION = 1
+SUPPORTED_SPEC_VERSION = 2
 
 NAME_RE = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
 VERSION_RE = re.compile(r"^\d+\.\d+\.\d+([.-][0-9A-Za-z.-]+)?$")
@@ -97,6 +97,17 @@ class ParamSpec:
 
 
 @dataclass(frozen=True)
+class MetricSpec:
+    """A declared metric: reports must lead with these, in this order (spec v2)."""
+
+    name: str
+    direction: str
+
+    def as_json(self) -> dict:
+        return {"name": self.name, "direction": self.direction}
+
+
+@dataclass(frozen=True)
 class BlobSpec:
     threshold: int = DEFAULT_BLOB_THRESHOLD
     track: tuple[str, ...] = ()
@@ -114,6 +125,7 @@ class Manifest:
     params: dict[str, ParamSpec] = field(default_factory=dict)
     blobs: BlobSpec = field(default_factory=BlobSpec)
     exclusive: str | None = None
+    metrics: tuple[MetricSpec, ...] = ()
 
     def resolve_params(self, overrides: dict) -> dict:
         unknown = set(overrides) - set(self.params)
@@ -128,7 +140,7 @@ class Manifest:
         }
 
     def as_json(self) -> dict:
-        return {
+        out = {
             "name": self.name,
             "version": self.version,
             "spec_version": self.spec_version,
@@ -137,6 +149,9 @@ class Manifest:
             "blobs": self.blobs.as_json(),
             "exclusive": self.exclusive,
         }
+        if self.spec_version >= 2:
+            out["metrics"] = [metric.as_json() for metric in self.metrics]
+        return out
 
 
 def _parse_param(name: str, raw) -> ParamSpec:
@@ -185,6 +200,33 @@ def _parse_param(name: str, raw) -> ParamSpec:
     )
 
 
+def _parse_metrics(raw, source: str) -> tuple[MetricSpec, ...]:
+    if not isinstance(raw, list) or not raw:
+        raise ManifestError(
+            f"{source}: metrics must be a non-empty list of "
+            "{name: ..., direction: max | min} entries, in ranking order"
+        )
+    parsed = []
+    for i, entry in enumerate(raw):
+        if not isinstance(entry, dict) or set(entry) != {"name", "direction"}:
+            raise ManifestError(
+                f"{source}: metrics[{i}] must be exactly {{name: ..., direction: max | min}}"
+            )
+        name = entry["name"]
+        if not isinstance(name, str) or not name:
+            raise ManifestError(f"{source}: metrics[{i}].name must be a non-empty string")
+        direction = entry["direction"]
+        if direction not in ("max", "min"):
+            raise ManifestError(
+                f"{source}: metrics[{i}].direction must be 'max' or 'min', got {direction!r}"
+            )
+        parsed.append(MetricSpec(name=name, direction=direction))
+    names = [metric.name for metric in parsed]
+    if len(set(names)) != len(names):
+        raise ManifestError(f"{source}: metric names must be unique")
+    return tuple(parsed)
+
+
 def _parse_spec_version(data, source: str) -> int:
     if "spec_version" not in data:
         raise ManifestError(
@@ -210,7 +252,7 @@ def parse(data, source: str = "hill.yaml") -> Manifest:
     # "upgrade hills", never with "unknown keys".
     spec_version = _parse_spec_version(data, source)
 
-    unknown = set(data) - {
+    known = {
         "name",
         "version",
         "spec_version",
@@ -219,6 +261,9 @@ def parse(data, source: str = "hill.yaml") -> Manifest:
         "blobs",
         "exclusive",
     }
+    if spec_version >= 2:
+        known.add("metrics")
+    unknown = set(data) - known
     if unknown:
         raise ManifestError(f"{source}: unknown keys {', '.join(sorted(unknown))}")
 
@@ -259,6 +304,15 @@ def parse(data, source: str = "hill.yaml") -> Manifest:
     if exclusive is not None and (not isinstance(exclusive, str) or not exclusive.strip()):
         raise ManifestError(f"{source}: exclusive must be a device name such as 'gpu'")
 
+    metrics: tuple[MetricSpec, ...] = ()
+    if spec_version >= 2:
+        if "metrics" not in data:
+            raise ManifestError(
+                f"{source}: spec version 2 requires a metrics key declaring what the "
+                "evaluator reports, e.g. metrics: [{name: score, direction: max}]"
+            )
+        metrics = _parse_metrics(data["metrics"], source)
+
     return Manifest(
         name=name,
         version=version,
@@ -267,6 +321,7 @@ def parse(data, source: str = "hill.yaml") -> Manifest:
         params=params,
         blobs=blobs,
         exclusive=exclusive,
+        metrics=metrics,
     )
 
 

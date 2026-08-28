@@ -1,6 +1,10 @@
-spec_version: 1
+spec_version: 2
 name: circle-packing
 version: 0.1.0
+
+# Reports lead with these, in ranking order.
+metrics:
+  - {name: sum_radii, direction: max}
 
 # The evaluator is exact arithmetic over a few hundred pairs; this bound only
 # exists so a pathological submission cannot wedge an agent loop.

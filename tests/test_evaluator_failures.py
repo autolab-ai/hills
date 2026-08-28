@@ -125,7 +125,7 @@ def test_the_evaluator_sees_private_content_that_git_never_stored(cli, hill, sub
         hill,
         "    secret = (Path(__file__).parent / 'private' / 'answer.txt').read_text()\n"
         "    return {'passed': True, 'metrics': "
-        "[{'name': 'answer', 'value': float(secret), 'direction': 'max'}]}\n",
+        "[{'name': 'score', 'value': float(secret), 'direction': 'max'}]}\n",
     )
     cli("eval", str(submission), "-H", "demo")
     assert json.loads(capsys.readouterr().out)["metrics"][0]["value"] == 42.0

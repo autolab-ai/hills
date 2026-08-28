@@ -1,6 +1,11 @@
-spec_version: 1
+spec_version: 2
 name: __NAME__
 version: 0.1.0
+
+# What the evaluator reports, in ranking order: every passing report must start
+# with exactly these, and ranking is lexicographic in this order.
+metrics:
+  - {name: score, direction: max}
 
 # Hard kill for a hung evaluator. Not a semantic time limit: if your task has a
 # time budget, enforce it inside eval.py, which owns the official clock.

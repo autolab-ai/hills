@@ -438,7 +438,7 @@ If you find this repo useful, please cite it:
   author       = {Lukoianov, Artem and Klein, Serge and Didenko, Serge},
   organization = {Autolab},
   year         = {2026},
-  version      = {0.3.0},
+  version      = {0.4.0},
   url          = {https://github.com/autolab-ai/hills}
 }
 ```

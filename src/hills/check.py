@@ -10,6 +10,7 @@ from pathlib import Path
 
 import hills
 from hills import uvenv
+from hills.sdk import DECLARED_METRICS_ENV
 from hills.hill import EVAL_ENTRYPOINT, PYPROJECT_NAME, README_NAME, Hill
 
 INTROSPECT = textwrap.dedent(
@@ -110,12 +111,17 @@ def _run_tests(hill: Hill, result: CheckResult) -> None:
         return
 
     tool_src = str(Path(hills.__file__).resolve().parent.parent)
+    test_env = {"PYTHONPATH": tool_src}
+    if hill.manifest.metrics:
+        test_env[DECLARED_METRICS_ENV] = json.dumps(
+            [metric.as_json() for metric in hill.manifest.metrics]
+        )
     has_pytest, _ = uvenv.run(
         hill.root,
         hill.name,
         uvenv.WORKING_TREE_ENV,
         ["python", "-c", "import pytest"],
-        extra_env={"PYTHONPATH": tool_src},
+        extra_env=test_env,
     )
     if has_pytest == 0:
         runs = [["python", "-m", "pytest", "-q", str(tests)]]
@@ -129,7 +135,7 @@ def _run_tests(hill: Hill, result: CheckResult) -> None:
             hill.name,
             uvenv.WORKING_TREE_ENV,
             argv,
-            extra_env={"PYTHONPATH": tool_src},
+            extra_env=test_env,
         )
         if code != 0:
             result.record("tests", False, output.strip())

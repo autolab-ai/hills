@@ -89,3 +89,30 @@ def validate_core(result) -> dict:
         raise CoreSchemaError("'details' must be an object")
 
     return {"passed": passed, "metrics": metrics, "config": config, "details": details}
+
+
+def metrics_prefix_violation(declared: list[dict], metrics: list[dict]) -> str | None:
+    """First divergence between declared metrics and a report's, or None.
+
+    Spec v2 hills declare their metrics in hill.yaml; a passing report must
+    start with exactly the declared entries — names, order, directions. Extra
+    metrics may follow and act as lower-priority tie-breaks.
+    """
+    for i, want in enumerate(declared):
+        if i >= len(metrics):
+            return (
+                f"the report is missing declared metric {want['name']!r} "
+                f"(hill.yaml declares {len(declared)} metric(s), the report has {len(metrics)})"
+            )
+        got = metrics[i]
+        if got["name"] != want["name"]:
+            return (
+                f"metrics[{i}] is {got['name']!r}, but hill.yaml declares {want['name']!r} "
+                "in this position (declared metrics must come first, in declared order)"
+            )
+        if got["direction"] != want["direction"]:
+            return (
+                f"metrics[{i}] ({got['name']!r}) has direction {got['direction']!r}, "
+                f"but hill.yaml declares {want['direction']!r}"
+            )
+    return None

@@ -202,7 +202,7 @@ def test_escaping_manifest_entry_is_rejected(archive, elsewhere, cli):
 def test_bundle_from_a_newer_spec_version_is_rejected(archive, elsewhere, cli, monkeypatch):
     """An older hills reading a newer hill fails with the upgrade message, not debris."""
     monkeypatch.setattr("hills.manifest.SUPPORTED_SPEC_VERSION", 0)
-    with pytest.raises(HillsError, match="spec version 1.*Upgrade hills"):
+    with pytest.raises(HillsError, match="spec version 2.*Upgrade hills"):
         cli("unbundle", str(archive), "--into", str(elsewhere))
     assert not (elsewhere / "circle-packing").exists()
 

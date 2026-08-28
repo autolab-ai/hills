@@ -40,9 +40,11 @@ A hill is a directory, versioned by its own embedded git repository:
 The manifest contains only what the tool needs to run the evaluator. Everything semantic — the task, the metric's meaning, hardware notes — lives in `README.md` and `eval.py`.
 
 ```yaml
-spec_version: 1                 # the manifest contract; written by `hills new`, see below
+spec_version: 2                 # the manifest contract; written by `hills new`, see below
 name: nanogpt-10min
 version: 0.1.0
+metrics:                        # what the evaluator reports, in ranking order (spec v2)
+  - {name: val_bpb, direction: min}
 watchdog_timeout_s: 1200        # hard kill for a hung evaluator; NOT a semantic time limit
 params:                         # optional; typed knobs, validated by the tool
   time_limit_s: {type: int, default: 600, min: 60, max: 1200}
@@ -53,7 +55,9 @@ blobs:                          # optional; large-file handling, see §5
 
 Semantic limits (e.g. "training gets 10 minutes") are enforced inside `eval.py`, which owns the official clock. `watchdog_timeout_s` is a generous last-resort bound so a hung evaluator cannot wedge an agent loop.
 
-**Manifest versioning.** `spec_version` names the manifest contract a hill was written against. A spec version fixes two things: the set of keys `hill.yaml` may contain, and the evaluator contract (§4); changing either, even by adding an optional key, is a new spec version. The tool reads hills with `spec_version` up to its `SUPPORTED_SPEC_VERSION` and rejects newer ones by naming the hills version required, so a hill from a newer contract fails with "upgrade hills", never with "unknown keys". `spec_version` is independent of the hill's own `version` (the author's version of the task) and of the hills package version. If a later spec version ever drops the ability to read an old one, that is a major release of hills.
+**Manifest versioning.** `spec_version` names the manifest contract a hill was written against. A spec version fixes two things: the set of keys `hill.yaml` may contain, and the evaluator contract (§4); changing either, even by adding an optional key, is a new spec version. The tool reads hills with `spec_version` up to its `SUPPORTED_SPEC_VERSION` and rejects newer ones by naming the hills version required, so a hill from a newer contract fails with "upgrade hills", never with "unknown keys". `spec_version` is independent of the hill's own `version` (the author's version of the task) and of the hills package version. If a later spec version ever drops the ability to read an old one, that is a major release of hills. Spec version 1 is the original contract without `metrics`; version 2 adds it as a required key.
+
+**Declared metrics (spec v2).** `metrics` states what the evaluator reports, in ranking order, so anything — a hub, a platform, `hills describe` — can show what a hill measures before the first run, and `eval.py` cannot silently drift from the README. The declaration is a prefix contract against reports: every passing report's `metrics` must start with exactly the declared entries — names, order, directions — and extras may follow as informational lower-priority tie-breaks under the lexicographic rule. Failing reports are exempt (they report no ranked result; the shipped evaluators return `metrics: []` on failure). Reports stay self-contained: per-metric `direction` stays in them, and `rank()`, signing, and verification are unchanged. Enforcement: `hills eval` refuses to sign a violating report (hard error, recorded as a failed attempt), and `hills check` exports the declaration to the hill's own tests, where `run_evaluator` applies the same rule to example reports.
 
 ## 4. The evaluator contract
 
