@@ -158,6 +158,7 @@ The full report goes to stdout as JSON; the summary above is stderr, so
   "final": false,
   "official": true,
   "official_reason": null,
+  "hill_spec_version": 1,
   "tool": {"version": "0.1.0", "sha256": "463ea637f2f79fb9…"},
   "timestamp": "2026-08-10T02:11:05Z",
   "report_version": 1,
@@ -221,7 +222,7 @@ A folder, versioned by its own private git repository:
 
 ```
 .autolab/hills/circle-packing/
-  hill.yaml        settings: the watchdog, typed knobs, large-file rules
+  hill.yaml        settings: the manifest contract version, the watchdog, typed knobs, large-file rules
   README.md        the task, written for the agent that will read it
   eval.py          the scoring code: def eval(submission: Path, **params) -> dict
   private/         what the agent must not see; never enters git
@@ -437,7 +438,7 @@ If you find this repo useful, please cite it:
   author       = {Lukoianov, Artem and Klein, Serge and Didenko, Serge},
   organization = {Autolab},
   year         = {2026},
-  version      = {0.2.0},
+  version      = {0.3.0},
   url          = {https://github.com/autolab-ai/hills}
 }
 ```

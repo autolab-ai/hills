@@ -128,6 +128,7 @@ def test_eval_produces_a_signed_report(cli, committed, submission, capsys):
     assert report["tree_hash"] == Hill.resolve("circle-packing").vc.tree_hash()
     assert report["official"] is True
     assert report["tool"]["version"] and report["tool"]["sha256"]
+    assert report["hill_spec_version"] == 1
 
     from hills import report as report_mod
 
@@ -230,6 +231,7 @@ def test_attempts_json_reports_chain_health(cli, committed, submission, capsys):
 def test_describe_is_json_with_the_readme_and_params(cli, committed, capsys):
     cli("describe", "circle-packing")
     described = json.loads(capsys.readouterr().out)
+    assert described["spec_version"] == 1
     assert described["hill"] == "circle-packing"
     assert "sum_radii" in described["readme"]
     assert described["params"]["n"]["default"] == 26

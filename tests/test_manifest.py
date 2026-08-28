@@ -4,6 +4,7 @@ from hills import manifest as manifest_mod
 from hills.errors import ManifestError
 
 MINIMAL = """
+spec_version: 1
 name: demo
 version: 0.1.0
 watchdog_timeout_s: 60
@@ -13,18 +14,39 @@ watchdog_timeout_s: 60
 def test_minimal_manifest():
     parsed = manifest_mod.loads(MINIMAL)
     assert parsed.name == "demo"
+    assert parsed.spec_version == 1
     assert parsed.params == {}
     assert parsed.blobs.threshold == 1024 * 1024
     assert parsed.exclusive is None
+    assert parsed.as_json()["spec_version"] == 1
+
+
+def test_missing_spec_version_says_how_to_fix_it():
+    with pytest.raises(ManifestError, match="spec_version: 1"):
+        manifest_mod.loads(MINIMAL.replace("spec_version: 1\n", ""))
+
+
+def test_newer_spec_version_says_to_upgrade_hills():
+    newer = manifest_mod.SUPPORTED_SPEC_VERSION + 1
+    text = MINIMAL.replace("spec_version: 1", f"spec_version: {newer}") + "future_key: 1\n"
+    with pytest.raises(ManifestError, match=f"spec version {newer}.*Upgrade hills") as caught:
+        manifest_mod.loads(text)
+    assert "unknown keys" not in str(caught.value)
+
+
+@pytest.mark.parametrize("bad", ["0", '"1"', "1.5", "true"])
+def test_spec_version_must_be_a_positive_integer(bad):
+    with pytest.raises(ManifestError, match="positive integer"):
+        manifest_mod.loads(MINIMAL.replace("spec_version: 1", f"spec_version: {bad}"))
 
 
 @pytest.mark.parametrize(
     "text, message",
     [
-        ("name: Demo\nversion: 0.1.0\nwatchdog_timeout_s: 1", "name must be lowercase"),
-        ("name: demo\nversion: 1\nwatchdog_timeout_s: 1", "version must look like"),
-        ("name: demo\nversion: 0.1.0\nwatchdog_timeout_s: 0", "positive integer"),
-        ("name: demo\nversion: 0.1.0\nwatchdog_timeout_s: 1\nnope: 1", "unknown keys"),
+        (MINIMAL.replace("name: demo", "name: Demo"), "name must be lowercase"),
+        (MINIMAL.replace("version: 0.1.0", "version: 1"), "version must look like"),
+        (MINIMAL.replace("watchdog_timeout_s: 60", "watchdog_timeout_s: 0"), "positive integer"),
+        (MINIMAL + "nope: 1\n", "unknown keys"),
     ],
 )
 def test_rejects_bad_manifests(text, message):

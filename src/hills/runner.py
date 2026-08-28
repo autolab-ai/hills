@@ -106,6 +106,7 @@ def evaluate(
             final=final,
             official=official,
             official_reason=official_reason,
+            hill_spec_version=hill.manifest.spec_version,
             tool_version=_tool_version(),
         )
 

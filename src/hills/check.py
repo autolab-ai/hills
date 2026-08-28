@@ -140,7 +140,11 @@ def _run_tests(hill: Hill, result: CheckResult) -> None:
 
 def check(hill: Hill, *, run_tests: bool = True) -> CheckResult:
     result = CheckResult()
-    result.record("manifest", True, f"{hill.manifest.name} {hill.manifest.version}")
+    result.record(
+        "manifest",
+        True,
+        f"{hill.manifest.name} {hill.manifest.version} (spec {hill.manifest.spec_version})",
+    )
     _required_files(hill, result)
     if not result.ok:
         return result

@@ -188,6 +188,7 @@ def cmd_describe(args) -> int:
     payload = {
         "hill": hill.name,
         "version": hill.manifest.version,
+        "spec_version": hill.manifest.spec_version,
         "path": str(hill.root),
         "tree_hash": hill.vc.tree_hash() if committed else None,
         "commit": hill.vc.commit_hash() if committed else None,

@@ -8,6 +8,11 @@ import yaml
 
 from hills.errors import ManifestError
 
+# The manifest contract this tool reads, named by `spec_version` in hill.yaml.
+# A spec version fixes the set of keys hill.yaml may contain and the evaluator
+# contract; changing either, even by adding an optional key, is a new version.
+SUPPORTED_SPEC_VERSION = 1
+
 NAME_RE = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
 VERSION_RE = re.compile(r"^\d+\.\d+\.\d+([.-][0-9A-Za-z.-]+)?$")
 
@@ -104,6 +109,7 @@ class BlobSpec:
 class Manifest:
     name: str
     version: str
+    spec_version: int
     watchdog_timeout_s: int
     params: dict[str, ParamSpec] = field(default_factory=dict)
     blobs: BlobSpec = field(default_factory=BlobSpec)
@@ -125,6 +131,7 @@ class Manifest:
         return {
             "name": self.name,
             "version": self.version,
+            "spec_version": self.spec_version,
             "watchdog_timeout_s": self.watchdog_timeout_s,
             "params": {name: spec.as_json() for name, spec in self.params.items()},
             "blobs": self.blobs.as_json(),
@@ -178,13 +185,35 @@ def _parse_param(name: str, raw) -> ParamSpec:
     )
 
 
+def _parse_spec_version(data, source: str) -> int:
+    if "spec_version" not in data:
+        raise ManifestError(
+            f"{source} has no spec_version. Add `spec_version: 1` at the top; it names "
+            "the manifest contract this hill was written against."
+        )
+    raw = data["spec_version"]
+    if not isinstance(raw, int) or isinstance(raw, bool) or raw < 1:
+        raise ManifestError(f"{source}: spec_version must be a positive integer, got {raw!r}")
+    if raw > SUPPORTED_SPEC_VERSION:
+        raise ManifestError(
+            f"{source}: this hill uses spec version {raw}, and this hills reads up to "
+            f"{SUPPORTED_SPEC_VERSION}. Upgrade hills to use this hill."
+        )
+    return raw
+
+
 def parse(data, source: str = "hill.yaml") -> Manifest:
     if not isinstance(data, dict):
         raise ManifestError(f"{source} must be a mapping")
 
+    # Before the unknown-keys check, so a hill from a newer contract fails with
+    # "upgrade hills", never with "unknown keys".
+    spec_version = _parse_spec_version(data, source)
+
     unknown = set(data) - {
         "name",
         "version",
+        "spec_version",
         "watchdog_timeout_s",
         "params",
         "blobs",
@@ -233,6 +262,7 @@ def parse(data, source: str = "hill.yaml") -> Manifest:
     return Manifest(
         name=name,
         version=version,
+        spec_version=spec_version,
         watchdog_timeout_s=watchdog,
         params=params,
         blobs=blobs,

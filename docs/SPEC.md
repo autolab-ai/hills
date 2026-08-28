@@ -40,6 +40,7 @@ A hill is a directory, versioned by its own embedded git repository:
 The manifest contains only what the tool needs to run the evaluator. Everything semantic — the task, the metric's meaning, hardware notes — lives in `README.md` and `eval.py`.
 
 ```yaml
+spec_version: 1                 # the manifest contract; written by `hills new`, see below
 name: nanogpt-10min
 version: 0.1.0
 watchdog_timeout_s: 1200        # hard kill for a hung evaluator; NOT a semantic time limit
@@ -51,6 +52,8 @@ blobs:                          # optional; large-file handling, see §5
 ```
 
 Semantic limits (e.g. "training gets 10 minutes") are enforced inside `eval.py`, which owns the official clock. `watchdog_timeout_s` is a generous last-resort bound so a hung evaluator cannot wedge an agent loop.
+
+**Manifest versioning.** `spec_version` names the manifest contract a hill was written against. A spec version fixes two things: the set of keys `hill.yaml` may contain, and the evaluator contract (§4); changing either, even by adding an optional key, is a new spec version. The tool reads hills with `spec_version` up to its `SUPPORTED_SPEC_VERSION` and rejects newer ones by naming the hills version required, so a hill from a newer contract fails with "upgrade hills", never with "unknown keys". `spec_version` is independent of the hill's own `version` (the author's version of the task) and of the hills package version. If a later spec version ever drops the ability to read an old one, that is a major release of hills.
 
 ## 4. The evaluator contract
 
@@ -104,6 +107,7 @@ The evaluator's returned dict is the report **core**. The tool wraps it in the *
   "metrics": [ ... ],
   "details": { ... },
   "params": {"time_limit_s": 600},
+  "hill_spec_version": 1,
   "tool": {"version": "0.1.0", "sha256": "…"},
   "timestamp": "2026-08-09T21:14:03Z",
   "signature": "hmac-sha256:…",
@@ -213,4 +217,5 @@ Decisions this implementation made where the specification left room:
 - **`--current` runs are logged under `state/<name>@current/`**, separate from official history.
 - **No global registry.** The specification called for `~/.autolab/hills/registry.json` mapping name to path. In practice it only rotted: deleting a hill left an entry behind, and nothing rebuilt it. Hills are found by walking up from the current directory for `.autolab/hills/<name>`, so there is no state to go stale, and `hills list` shows the hills of the current project rather than the machine.
 - **A hill travels as one file: `hills bundle` / `hills unbundle`.** Cloning `.vc` alone gives a hill that `eval` refuses to run, because `private/` and lock-tracked blobs are never in git. A bundle is an uncompressed POSIX tar (`<name>-<tree_hash[:12]>.hill.tar`, format version 1) with `bundle.json` first, then `git.bundle` (the full history reachable from HEAD, so `hills log` works after unpacking), then every locked file under `locked/<hill-relative path>`. `bundle.json` records the hill, version, tree hash, commit, tool version and hash, and a `files` list whose sha256 and size values are copied from the locks at HEAD rather than rehashed, with a `kind` of `private` or `blob`. `--no-private` omits `private/` and says so in `private_included`, so the copy unpacks but cannot evaluate until the files are supplied. Bundling has the same clean-tree gate as `eval`, and verifies locked content against the locks before writing. Unbundling trusts nothing: every tar member must be a regular file, relative, free of `..`, and listed in the manifest; after extraction the working tree must be clean, locked content must match the locks, and the tree hash must equal the manifest's, or the partial directory is removed. Machine state under `HILLS_HOME` is never part of a bundle.
+- **`spec_version` in the manifest** names the contract, and reports carry it as `hill_spec_version`. `report_version` stays 1: adding a field is additive, and readers ignore unknown fields.
 - **Three extra commands** beyond the specified list: `hills list`, `hills examples` (the bundled example hills) and `hills home` (where machine state lives).

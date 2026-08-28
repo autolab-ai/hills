@@ -4,6 +4,7 @@ from hills import locks, manifest as manifest_mod
 from hills.errors import LockMismatch
 
 MANIFEST = """
+spec_version: 1
 name: demo
 version: 0.1.0
 watchdog_timeout_s: 60

@@ -34,6 +34,8 @@ by this, and it is what stops old scores from silently changing meaning.
 **`hill.yaml`** holds only what the tool needs to run the evaluator: the
 watchdog bound, typed params, blob rules, and `exclusive: gpu` when the metric is
 a physical measurement on shared hardware. Semantic limits belong in `eval.py`.
+`hills new` writes `spec_version` (the manifest contract version); you never
+change it.
 
 **`eval.py`** is one function:
 

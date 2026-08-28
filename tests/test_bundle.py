@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from hills import bundles
-from hills.errors import BundleError, DirtyHill, LockMismatch
+from hills.errors import BundleError, DirtyHill, HillsError, LockMismatch
 from hills.hill import Hill
 
 pytestmark = pytest.mark.usefixtures("project")
@@ -197,6 +197,14 @@ def test_escaping_manifest_entry_is_rejected(archive, elsewhere, cli):
     rewrite(archive, edit)
     with pytest.raises(BundleError, match="unsafe path"):
         cli("unbundle", str(archive), "--into", str(elsewhere))
+
+
+def test_bundle_from_a_newer_spec_version_is_rejected(archive, elsewhere, cli, monkeypatch):
+    """An older hills reading a newer hill fails with the upgrade message, not debris."""
+    monkeypatch.setattr("hills.manifest.SUPPORTED_SPEC_VERSION", 0)
+    with pytest.raises(HillsError, match="spec version 1.*Upgrade hills"):
+        cli("unbundle", str(archive), "--into", str(elsewhere))
+    assert not (elsewhere / "circle-packing").exists()
 
 
 def test_unknown_format_version_is_rejected(archive, elsewhere, cli):

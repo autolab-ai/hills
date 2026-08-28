@@ -81,6 +81,7 @@ def build(
     final: bool,
     official: bool,
     official_reason: str | None,
+    hill_spec_version: int,
     tool_version: str,
 ) -> dict:
     report = {
@@ -97,6 +98,7 @@ def build(
         "final": final,
         "official": official,
         "official_reason": official_reason,
+        "hill_spec_version": hill_spec_version,
         "tool": {"version": tool_version, "sha256": tool_hash()},
         "timestamp": now_utc(),
         "report_version": REPORT_VERSION,

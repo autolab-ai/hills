@@ -37,6 +37,7 @@ def build(**overrides):
         "params": {"steps": 10},
         "final": False,
         "official": True,
+        "hill_spec_version": 1,
         "official_reason": None,
         "tool_version": "0.1.0",
     }
