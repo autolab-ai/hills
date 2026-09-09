@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import hills
-from hills import uvenv
+from hills import runtime, uvenv
 from hills.sdk import DECLARED_METRICS_ENV
 from hills.hill import EVAL_ENTRYPOINT, PYPROJECT_NAME, README_NAME, Hill
 
@@ -61,6 +61,18 @@ class CheckResult:
         self.ok = self.ok and ok
 
 
+def _exec(hill: Hill, argv, *, env=None, binds=()):
+    """Run a check step in the hill's environment: the uv env, or, when the hill
+    declares one, inside its container image (binding the hill root and any
+    extra paths the step needs)."""
+    if hill.manifest.environment:
+        all_binds = [(hill.root, False), *binds]
+        return runtime.run(
+            hill.manifest.environment.image, argv, workdir=hill.root, binds=all_binds, env=env or {}
+        )
+    return uvenv.run(hill.root, hill.name, uvenv.WORKING_TREE_ENV, argv, extra_env=env)
+
+
 def _required_files(hill: Hill, result: CheckResult) -> None:
     missing = [
         name
@@ -85,11 +97,10 @@ def _dry_validate(hill: Hill, result: CheckResult, script_dir: Path) -> None:
     script = script_dir / "_introspect.py"
     script.write_text(INTROSPECT + "\n")
     declared = json.dumps(sorted(hill.manifest.params))
-    code, output = uvenv.run(
-        hill.root,
-        hill.name,
-        uvenv.WORKING_TREE_ENV,
+    code, output = _exec(
+        hill,
         ["python", str(script), str(hill.root), declared],
+        binds=[(script_dir, True)],
     )
     if code != 0:
         result.record("evaluator contract", False, output.strip())
@@ -110,19 +121,18 @@ def _run_tests(hill: Hill, result: CheckResult) -> None:
         result.record("tests", True, "no tests/ directory (optional, but recommended)")
         return
 
-    tool_src = str(Path(hills.__file__).resolve().parent.parent)
-    test_env = {"PYTHONPATH": tool_src}
+    test_env = {}
     if hill.manifest.metrics:
         test_env[DECLARED_METRICS_ENV] = json.dumps(
             [metric.as_json() for metric in hill.manifest.metrics]
         )
-    has_pytest, _ = uvenv.run(
-        hill.root,
-        hill.name,
-        uvenv.WORKING_TREE_ENV,
-        ["python", "-c", "import pytest"],
-        extra_env=test_env,
-    )
+    if hill.manifest.environment:
+        # In-image tests use the image's own hills (and pyyaml); the host
+        # site-packages is never injected, so tests validate the real image.
+        pass
+    else:
+        test_env["PYTHONPATH"] = str(Path(hills.__file__).resolve().parent.parent)
+    has_pytest, _ = _exec(hill, ["python", "-c", "import pytest"], env=test_env)
     if has_pytest == 0:
         runs = [["python", "-m", "pytest", "-q", str(tests)]]
     else:
@@ -130,13 +140,7 @@ def _run_tests(hill: Hill, result: CheckResult) -> None:
 
     output = ""
     for argv in runs:
-        code, output = uvenv.run(
-            hill.root,
-            hill.name,
-            uvenv.WORKING_TREE_ENV,
-            argv,
-            extra_env=test_env,
-        )
+        code, output = _exec(hill, argv, env=test_env)
         if code != 0:
             result.record("tests", False, output.strip())
             return
@@ -155,8 +159,19 @@ def check(hill: Hill, *, run_tests: bool = True) -> CheckResult:
     if not result.ok:
         return result
 
-    uvenv.lock(hill.root, hill.name)
-    result.record("dependencies", True, "uv.lock is up to date")
+    if hill.manifest.environment:
+        if runtime.detect() is None:
+            result.record(
+                "dependencies",
+                False,
+                "environment.image needs a container runtime (docker, podman, or "
+                "apptainer) on PATH; none was found.",
+            )
+            return result
+        result.record("dependencies", True, f"image {hill.manifest.environment.image}")
+    else:
+        uvenv.lock(hill.root, hill.name)
+        result.record("dependencies", True, "uv.lock is up to date")
 
     with tempfile.TemporaryDirectory(prefix="hills-check-") as scratch:
         _dry_validate(hill, result, Path(scratch))

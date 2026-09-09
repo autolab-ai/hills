@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from hills import devlock, locks, paths, report as report_mod, state, uvenv
+from hills import devlock, locks, paths, report as report_mod, runtime, state, uvenv
 from hills.canonical import dumps
 from hills.core_schema import metrics_prefix_violation, validate_core
 from hills.errors import DirtyHill, EvaluatorFailed, HillsError
@@ -178,29 +178,85 @@ def _run_evaluator(hill, hill_root, run_dir, submission, params, final, env_key,
 
     log_path = run_dir / "evaluator.log"
     extra_env = {"HILLS_RUN_DIR": str(run_dir), "HILLS_HILL_ROOT": str(hill_root)}
+    # For an official run the version being scored is the materialized hill, so
+    # its environment and watchdog come from there, not the working tree (which
+    # --force may have moved on).
+    run_manifest = hill.manifest
+    if Path(hill_root).resolve() != Path(hill.root).resolve():
+        from hills import manifest as manifest_mod
 
-    warm, warm_output = uvenv.run(
-        hill_root, hill.name, env_key, ["python", "-c", "pass"], log_path=run_dir / "env.log"
-    )
-    if warm != 0:
-        return None, f"could not prepare the hill environment:\n{warm_output.strip()}"
+        run_manifest = manifest_mod.load(Path(hill_root) / "hill.yaml")
+    image = run_manifest.environment.image if run_manifest.environment else None
+    timeout = run_manifest.watchdog_timeout_s
 
-    try:
-        code, output = uvenv.run(
-            hill_root,
-            hill.name,
-            env_key,
-            ["python", str(shim), str(invocation)],
-            timeout=hill.manifest.watchdog_timeout_s,
-            log_path=log_path,
-            stream=stream,
-            extra_env=extra_env,
+    if image:
+        # The image is the environment: run the (stdlib-only) shim inside it.
+        try:
+            runtime_name = runtime.require()
+        except HillsError as error:
+            return None, str(error)
+        warm, warm_output = runtime.ensure_image(runtime_name, image, log_path=run_dir / "env.log")
+        if warm != 0:
+            return None, f"could not pull the hill's image {image}:\n{warm_output.strip()}"
+        # run_dir (rw) holds the shim, invocation, submission, result.json and,
+        # for an official run, the materialized hill. Bind whatever else the
+        # evaluator needs at its own path so the absolute paths in
+        # invocation.json resolve inside the container:
+        #   - hill_root when it is the working tree (--current), writable;
+        #   - the live hill root read-only, so a materialized private/ symlink
+        #     resolves to its target.
+        def _under(child: Path, parent: Path) -> bool:
+            try:
+                Path(child).resolve().relative_to(Path(parent).resolve())
+                return True
+            except ValueError:
+                return False
+
+        binds: list[tuple[Path, bool]] = [(run_dir, False)]
+        if not _under(Path(hill_root), run_dir):
+            binds.append((Path(hill_root), False))
+        if not _under(Path(hill.root), run_dir) and (
+            Path(hill.root).resolve() != Path(hill_root).resolve()
+        ):
+            binds.append((Path(hill.root), True))
+        try:
+            code, output = runtime.run(
+                image,
+                ["python", str(shim), str(invocation)],
+                workdir=run_dir,
+                binds=binds,
+                env=extra_env,
+                timeout=timeout,
+                log_path=log_path,
+                stream=stream,
+                runtime=runtime_name,
+            )
+        except subprocess.TimeoutExpired:
+            return None, (
+                f"watchdog killed the evaluator after {timeout}s. Output: {log_path}"
+            )
+    else:
+        warm, warm_output = uvenv.run(
+            hill_root, hill.name, env_key, ["python", "-c", "pass"], log_path=run_dir / "env.log"
         )
-    except subprocess.TimeoutExpired:
-        return None, (
-            f"watchdog killed the evaluator after {hill.manifest.watchdog_timeout_s}s. "
-            f"Output: {log_path}"
-        )
+        if warm != 0:
+            return None, f"could not prepare the hill environment:\n{warm_output.strip()}"
+
+        try:
+            code, output = uvenv.run(
+                hill_root,
+                hill.name,
+                env_key,
+                ["python", str(shim), str(invocation)],
+                timeout=timeout,
+                log_path=log_path,
+                stream=stream,
+                extra_env=extra_env,
+            )
+        except subprocess.TimeoutExpired:
+            return None, (
+                f"watchdog killed the evaluator after {timeout}s. Output: {log_path}"
+            )
 
     if not result_path.is_file():
         return None, (
@@ -213,8 +269,8 @@ def _run_evaluator(hill, hill_root, run_dir, submission, params, final, env_key,
         return None, "the evaluator raised:\n" + payload["error"]["traceback"].rstrip()
 
     core = validate_core(payload["result"])
-    if core["passed"] and hill.manifest.metrics:
-        declared = [metric.as_json() for metric in hill.manifest.metrics]
+    if core["passed"] and run_manifest.metrics:
+        declared = [metric.as_json() for metric in run_manifest.metrics]
         violation = metrics_prefix_violation(declared, core["metrics"])
         if violation:
             return None, (

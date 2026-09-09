@@ -11,7 +11,7 @@ from hills.errors import ManifestError
 # The manifest contract this tool reads, named by `spec_version` in hill.yaml.
 # A spec version fixes the set of keys hill.yaml may contain and the evaluator
 # contract; changing either, even by adding an optional key, is a new version.
-SUPPORTED_SPEC_VERSION = 2
+SUPPORTED_SPEC_VERSION = 3
 
 NAME_RE = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
 VERSION_RE = re.compile(r"^\d+\.\d+\.\d+([.-][0-9A-Za-z.-]+)?$")
@@ -117,6 +117,23 @@ class BlobSpec:
 
 
 @dataclass(frozen=True)
+class EnvironmentSpec:
+    """The container image the evaluator, and `hills check`'s tests, run inside.
+
+    Absent (the default) means the evaluator runs in the hill's uv environment,
+    as it always has. When set, the tool runs the evaluator inside this image
+    with whatever container runtime is present (docker, podman, or apptainer).
+    Pin by digest (image@sha256:...) for reproducibility: the image contents are
+    not part of the hill's tree hash, only this reference is.
+    """
+
+    image: str
+
+    def as_json(self) -> dict:
+        return {"image": self.image}
+
+
+@dataclass(frozen=True)
 class Manifest:
     name: str
     version: str
@@ -126,6 +143,7 @@ class Manifest:
     blobs: BlobSpec = field(default_factory=BlobSpec)
     exclusive: str | None = None
     metrics: tuple[MetricSpec, ...] = ()
+    environment: EnvironmentSpec | None = None
 
     def resolve_params(self, overrides: dict) -> dict:
         unknown = set(overrides) - set(self.params)
@@ -151,6 +169,8 @@ class Manifest:
         }
         if self.spec_version >= 2:
             out["metrics"] = [metric.as_json() for metric in self.metrics]
+        if self.spec_version >= 3 and self.environment is not None:
+            out["environment"] = self.environment.as_json()
         return out
 
 
@@ -227,6 +247,22 @@ def _parse_metrics(raw, source: str) -> tuple[MetricSpec, ...]:
     return tuple(parsed)
 
 
+def _parse_environment(raw, source: str) -> EnvironmentSpec:
+    if not isinstance(raw, dict):
+        raise ManifestError(f"{source}: environment must be a mapping with an 'image'")
+    unknown = set(raw) - {"image"}
+    if unknown:
+        raise ManifestError(
+            f"{source}: environment has unknown keys {', '.join(sorted(unknown))}"
+        )
+    image = raw.get("image")
+    if not isinstance(image, str) or not image.strip():
+        raise ManifestError(
+            f"{source}: environment.image must be a non-empty image reference"
+        )
+    return EnvironmentSpec(image=image.strip())
+
+
 def _parse_spec_version(data, source: str) -> int:
     if "spec_version" not in data:
         raise ManifestError(
@@ -263,6 +299,8 @@ def parse(data, source: str = "hill.yaml") -> Manifest:
     }
     if spec_version >= 2:
         known.add("metrics")
+    if spec_version >= 3:
+        known.add("environment")
     unknown = set(data) - known
     if unknown:
         raise ManifestError(f"{source}: unknown keys {', '.join(sorted(unknown))}")
@@ -313,6 +351,10 @@ def parse(data, source: str = "hill.yaml") -> Manifest:
             )
         metrics = _parse_metrics(data["metrics"], source)
 
+    environment = None
+    if spec_version >= 3 and data.get("environment") is not None:
+        environment = _parse_environment(data["environment"], source)
+
     return Manifest(
         name=name,
         version=version,
@@ -322,6 +364,7 @@ def parse(data, source: str = "hill.yaml") -> Manifest:
         blobs=blobs,
         exclusive=exclusive,
         metrics=metrics,
+        environment=environment,
     )
 
 

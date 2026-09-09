@@ -8,11 +8,9 @@ interpreter with the tool or with the user's project.
 import os
 import shutil
 import subprocess
-import sys
-import threading
 from pathlib import Path
 
-from hills import paths
+from hills import paths, proc
 from hills.errors import HillsError
 
 WORKING_TREE_ENV = "current"
@@ -86,58 +84,15 @@ def run(
     argv, environment = command(project, hill_name, env_key, argv)
     if extra_env:
         environment.update(extra_env)
-
-    process = subprocess.Popen(
+    return proc.stream_run(
         argv,
         cwd=project,
         env=environment,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        start_new_session=True,
+        timeout=timeout,
+        log_path=log_path,
+        stream=stream,
     )
 
-    chunks: list[bytes] = []
-    sink = open(log_path, "wb") if log_path else None
 
-    def pump() -> None:
-        for line in process.stdout:
-            chunks.append(line)
-            if sink:
-                sink.write(line)
-                sink.flush()
-            if stream:
-                sys.stderr.buffer.write(line)
-                sys.stderr.buffer.flush()
-
-    reader = threading.Thread(target=pump, daemon=True)
-    reader.start()
-
-    try:
-        process.wait(timeout=timeout)
-    except subprocess.TimeoutExpired:
-        terminate_group(process)
-        reader.join(timeout=5)
-        if sink:
-            sink.close()
-        raise
-    finally:
-        reader.join(timeout=10)
-        if sink and not sink.closed:
-            sink.close()
-
-    return process.returncode, b"".join(chunks).decode("utf-8", "replace")
-
-
-def terminate_group(process: subprocess.Popen) -> None:
-    """Kill the evaluator and everything it launched."""
-    import signal
-
-    for sig in (signal.SIGTERM, signal.SIGKILL):
-        if process.poll() is not None:
-            return
-        os.killpg(os.getpgid(process.pid), sig)
-        try:
-            process.wait(timeout=5)
-            return
-        except subprocess.TimeoutExpired:
-            continue
+# Back-compat alias; the implementation now lives in hills.proc.
+terminate_group = proc.terminate_group

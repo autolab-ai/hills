@@ -23,3 +23,9 @@ params:
 # Uncomment when the metric is a physical measurement on shared hardware, so
 # concurrent official runs cannot corrupt each other.
 # exclusive: gpu
+
+# To run the evaluator inside a container image instead of the uv environment
+# (for a heavy toolchain, a non-Python stack, or a reproducible base), set
+# `spec_version: 3` above and add:
+# environment:
+#   image: ghcr.io/you/your-image@sha256:...   # pin by digest, not a mutable tag

@@ -34,10 +34,24 @@ by this, and it is what stops old scores from silently changing meaning.
 **`hill.yaml`** holds only what the tool needs to run the evaluator: the
 watchdog bound, typed params, blob rules, and `exclusive: gpu` when the metric is
 a physical measurement on shared hardware. Semantic limits belong in `eval.py`.
-`hills new` writes `spec_version` (the manifest contract version); you never
-change it. It also declares `metrics` — name and direction, in ranking order —
-which every passing report must lead with; keep it, `eval.py`, and the README's
-metric table saying the same thing.
+`hills new` writes `spec_version` (the manifest contract version). It also
+declares `metrics` — name and direction, in ranking order — which every passing
+report must lead with; keep it, `eval.py`, and the README's metric table saying
+the same thing.
+
+For a heavy toolchain (Lean, CUDA), a non-Python stack, or a reproducible base,
+run the evaluator inside a container image instead of the uv environment: set
+`spec_version: 3` and add
+
+```yaml
+environment:
+  image: ghcr.io/you/your-image@sha256:...   # pin by digest, not a mutable tag
+```
+
+The image provides Python (the shim is standard-library only) and your
+toolchain; there is no uv sync for image hills. `hills eval` and `hills check`
+run inside it via docker or podman locally, apptainer on HPC. A hill without an
+`environment` runs in the uv environment exactly as before.
 
 **`eval.py`** is one function:
 
