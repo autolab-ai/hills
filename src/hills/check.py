@@ -3,13 +3,14 @@ and the hill's own tests. `hills commit` refuses to commit if check fails.
 """
 
 import json
+import os
 import tempfile
 import textwrap
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import hills
-from hills import runtime, uvenv
+from hills import proc, runtime, uvenv
 from hills.sdk import DECLARED_METRICS_ENV
 from hills.hill import EVAL_ENTRYPOINT, PYPROJECT_NAME, README_NAME, Hill
 
@@ -66,6 +67,9 @@ def _exec(hill: Hill, argv, *, env=None, binds=()):
     declares one, inside its container image (binding the hill root and any
     extra paths the step needs)."""
     if hill.manifest.environment:
+        if (os.environ.get("HILLS_RUNTIME") or "").strip() == "host":
+            # Already inside the image (a pod booted from it): run directly.
+            return proc.stream_run(list(argv), cwd=hill.root, env={**os.environ, **(env or {})})
         all_binds = [(hill.root, False), *binds]
         return runtime.run(
             hill.manifest.environment.image, argv, workdir=hill.root, binds=all_binds, env=env or {}
@@ -160,15 +164,20 @@ def check(hill: Hill, *, run_tests: bool = True) -> CheckResult:
         return result
 
     if hill.manifest.environment:
-        if runtime.detect() is None:
+        if (os.environ.get("HILLS_RUNTIME") or "").strip() == "host":
+            # Running in-image: the ambient environment IS the image, so no
+            # container runtime is needed.
+            result.record("dependencies", True, "in-image (runtime=host)")
+        elif runtime.detect() is None:
             result.record(
                 "dependencies",
                 False,
-                "environment.image needs a container runtime (docker, podman, or "
-                "apptainer) on PATH; none was found.",
+                "environment.image needs a container runtime (docker, podman, "
+                "apptainer, or singularity) on PATH; none was found.",
             )
             return result
-        result.record("dependencies", True, f"image {hill.manifest.environment.image}")
+        else:
+            result.record("dependencies", True, f"image {hill.manifest.environment.image}")
     else:
         uvenv.lock(hill.root, hill.name)
         result.record("dependencies", True, "uv.lock is up to date")

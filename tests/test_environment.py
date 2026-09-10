@@ -251,3 +251,25 @@ def test_real_image_official_run_uses_the_materialized_hill(project, cli, capsys
     report = json.loads(capsys.readouterr().out)
     assert report["official"] is True
     assert report["metrics"][0]["value"] == 5.0
+
+
+# ── runtime=host: run the evaluator directly, no container ─────────────────
+# The "pod = image" path: when the environment already IS the hill's image,
+# HILLS_RUNTIME=host runs the evaluator natively (no nesting), so it needs no
+# container runtime and works in plain CI.
+
+
+def test_host_runtime_runs_the_evaluator_without_a_container(project, cli, monkeypatch, capsys):
+    import json
+
+    monkeypatch.setenv("HILLS_RUNTIME", "host")
+    # No container runtime available — host mode must not need one.
+    monkeypatch.setattr("hills.runtime.detect", lambda *a, **k: None)
+    hill = _image_hill(project, cli)
+    (hill / "eval.py").write_text(REAL_EVAL)
+    sub = project / "attempt"
+    sub.mkdir()
+    (sub / "solution.json").write_text('{"value": 11}')
+    assert cli("eval", str(sub), "-H", "demo", "--current") == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report["metrics"][0]["value"] == 11.0

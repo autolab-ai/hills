@@ -9,7 +9,7 @@ from hills.core_schema import validate_core
 from hills.errors import BundleError
 from hills.sdk import load_evaluator, run_evaluator
 
-__version__ = "0.7.0"
+__version__ = "0.8.0"
 __all__ = [
     "__version__",
     "BundleError",

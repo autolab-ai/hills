@@ -470,7 +470,7 @@ def build_parser() -> argparse.ArgumentParser:
     check.add_argument("name")
     check.add_argument("--no-tests", action="store_true", help="skip tests/")
     check.add_argument(
-        "--runtime", choices=runtime_mod.RUNTIMES,
+        "--runtime", choices=(*runtime_mod.RUNTIMES, "host"),
         help="force a container runtime for an image hill (else auto-detect; also HILLS_RUNTIME)",
     )
     check.set_defaults(func=cmd_check)
@@ -507,7 +507,7 @@ def build_parser() -> argparse.ArgumentParser:
     mode.add_argument("--current", action="store_true", help="evaluate the working tree; report is unofficial")
     evaluate.add_argument("--queue", action="store_true", help="wait for a busy device instead of failing")
     evaluate.add_argument(
-        "--runtime", choices=runtime_mod.RUNTIMES,
+        "--runtime", choices=(*runtime_mod.RUNTIMES, "host"),
         help="force a container runtime for an image hill (else auto-detect; also HILLS_RUNTIME)",
     )
     evaluate.add_argument("-v", "--verbose", action="store_true", help="stream evaluator output")

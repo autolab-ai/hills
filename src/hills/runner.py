@@ -1,6 +1,7 @@
 """`hills eval`: run a frozen hill's evaluator against a submission directory."""
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -9,7 +10,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from hills import devlock, locks, paths, report as report_mod, runtime, state, uvenv
+from hills import devlock, locks, paths, proc, report as report_mod, runtime, state, uvenv
 from hills.canonical import dumps
 from hills.core_schema import metrics_prefix_violation, validate_core
 from hills.errors import DirtyHill, EvaluatorFailed, HillsError
@@ -189,7 +190,28 @@ def _run_evaluator(hill, hill_root, run_dir, submission, params, final, env_key,
     image = run_manifest.environment.image if run_manifest.environment else None
     timeout = run_manifest.watchdog_timeout_s
 
-    if image:
+    if image and (os.environ.get("HILLS_RUNTIME") or "").strip() == "host":
+        # The current environment already IS the hill's image (e.g. a rented pod
+        # booted from environment.image), so run the evaluator directly — no
+        # nested container. The shim is stdlib-only; eval.py's deps and tools
+        # come from the ambient image. This is what makes image hills work on
+        # hosts where nesting is impossible (unprivileged pods with no userns).
+        if stream:
+            print("hills: running the evaluator in-image (runtime=host)", flush=True)
+        try:
+            code, output = proc.stream_run(
+                ["python", str(shim), str(invocation)],
+                cwd=run_dir,
+                env={**os.environ, **extra_env},
+                timeout=timeout,
+                log_path=log_path,
+                stream=stream,
+            )
+        except subprocess.TimeoutExpired:
+            return None, (
+                f"watchdog killed the evaluator after {timeout}s. Output: {log_path}"
+            )
+    elif image:
         # The image is the environment: run the (stdlib-only) shim inside it.
         try:
             runtime_name = runtime.require()
