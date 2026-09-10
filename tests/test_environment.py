@@ -273,3 +273,26 @@ def test_host_runtime_runs_the_evaluator_without_a_container(project, cli, monke
     assert cli("eval", str(sub), "-H", "demo", "--current") == 0
     report = json.loads(capsys.readouterr().out)
     assert report["metrics"][0]["value"] == 11.0
+
+
+def test_host_python_skips_the_launcher_venv(monkeypatch, tmp_path):
+    # The image's python must win over the ephemeral one a launcher (uv tool
+    # run) prepends to PATH.
+    from hills import runner
+
+    img_bin = tmp_path / "usr" / "bin"
+    img_bin.mkdir(parents=True)
+    img_py = img_bin / "python3"
+    img_py.write_text("#!/bin/sh\n")
+    img_py.chmod(0o755)
+    uv_bin = tmp_path / ".cache" / "uv" / "env" / "bin"
+    uv_bin.mkdir(parents=True)
+    (uv_bin / "python3").write_text("#!/bin/sh\n")
+    (uv_bin / "python3").chmod(0o755)
+    monkeypatch.delenv("HILLS_HOST_PYTHON", raising=False)
+    monkeypatch.delenv("VIRTUAL_ENV", raising=False)
+    monkeypatch.setenv("PATH", f"{uv_bin}:{img_bin}")
+    assert runner._host_python() == str(img_py)
+    # Explicit override wins.
+    monkeypatch.setenv("HILLS_HOST_PYTHON", "/opt/py/bin/python")
+    assert runner._host_python() == "/opt/py/bin/python"

@@ -158,6 +158,35 @@ def _prepare_hill(hill: Hill, run_dir: Path, *, force: bool, current: bool):
     return materialized, tree_hash, hill.vc.commit_hash(), True, None, tree_hash
 
 
+def _host_python() -> str:
+    """The interpreter for an in-image (runtime=host) evaluation.
+
+    The evaluator must run under the IMAGE's Python — the one that has the
+    hill's dependencies — not the ephemeral interpreter a launcher like
+    ``uv tool run`` created just to start hills (which prepends its own venv to
+    PATH, so a bare ``python`` would resolve there and miss image packages).
+    Honor ``HILLS_HOST_PYTHON`` if the caller set it; otherwise find python on
+    PATH with the active venv / uv tool dirs removed; last resort ``python3``.
+    """
+    explicit = os.environ.get("HILLS_HOST_PYTHON")
+    if explicit:
+        return explicit
+    venv_bin = ""
+    venv = os.environ.get("VIRTUAL_ENV")
+    if venv:
+        venv_bin = str(Path(venv) / "bin")
+    parts = [
+        p
+        for p in os.environ.get("PATH", "").split(os.pathsep)
+        if p and p != venv_bin and "/uv/" not in p and "/.cache/uv/" not in p
+    ]
+    for name in ("python3", "python"):
+        found = shutil.which(name, path=os.pathsep.join(parts))
+        if found:
+            return found
+    return "python3"
+
+
 def _run_evaluator(hill, hill_root, run_dir, submission, params, final, env_key, stream):
     """Spawn the shim under the watchdog. Returns (core, error message)."""
     shim = run_dir / SHIM_NAME
@@ -200,7 +229,7 @@ def _run_evaluator(hill, hill_root, run_dir, submission, params, final, env_key,
             print("hills: running the evaluator in-image (runtime=host)", flush=True)
         try:
             code, output = proc.stream_run(
-                ["python", str(shim), str(invocation)],
+                [_host_python(), str(shim), str(invocation)],
                 cwd=run_dir,
                 env={**os.environ, **extra_env},
                 timeout=timeout,
