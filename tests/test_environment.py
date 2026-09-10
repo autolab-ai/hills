@@ -119,6 +119,40 @@ def test_detect_and_require(monkeypatch):
         runtime.require()
 
 
+def test_singularity_is_a_recognized_runtime(monkeypatch):
+    # singularity is apptainer's sibling: daemonless, same exec CLI.
+    assert "singularity" in runtime.RUNTIMES
+    monkeypatch.setattr(runtime.shutil, "which", lambda n: f"/usr/bin/{n}" if n == "singularity" else None)
+    monkeypatch.setattr(runtime, "_usable", lambda n: True)
+    assert runtime.detect() == "singularity"
+    cmd = runtime.build_command(
+        "singularity", "img", ["python", "shim"], workdir=Path("/w"), binds=[(Path("/r"), False)], env={"K": "V"}
+    )
+    assert cmd[:2] == ["singularity", "exec"]
+    assert "--cleanenv" in cmd and "--no-eval" in cmd
+    assert "docker://img" in cmd  # converts an OCI ref on the fly, like apptainer
+
+
+def test_runtime_override_forces_a_choice(monkeypatch):
+    # Everything is usable; the override / HILLS_RUNTIME picks one regardless of order.
+    monkeypatch.setattr(runtime.shutil, "which", lambda n: f"/usr/bin/{n}")
+    monkeypatch.setattr(runtime, "_usable", lambda n: True)
+    assert runtime.detect() == "docker"  # default order
+    assert runtime.detect("apptainer") == "apptainer"
+    monkeypatch.setenv("HILLS_RUNTIME", "podman")
+    assert runtime.detect() == "podman"  # env honored
+    monkeypatch.delenv("HILLS_RUNTIME", raising=False)
+
+
+def test_require_errors_clearly_on_a_forced_but_unusable_runtime(monkeypatch):
+    monkeypatch.setattr(runtime.shutil, "which", lambda n: None)  # nothing on PATH
+    monkeypatch.setattr(runtime, "_usable", lambda n: False)
+    with pytest.raises(HillsError, match="requested container runtime 'apptainer'"):
+        runtime.require("apptainer")
+    with pytest.raises(HillsError, match="unknown container runtime"):
+        runtime.require("nope")
+
+
 def test_detect_skips_a_runtime_whose_daemon_is_down(monkeypatch):
     # docker's client exists but its daemon is unreachable; a working podman wins.
     monkeypatch.setattr(runtime.shutil, "which", lambda n: f"/usr/bin/{n}" if n in ("docker", "podman") else None)
@@ -159,7 +193,7 @@ def _image_hill(project, cli):
 
 
 def test_eval_without_a_runtime_reports_clearly(project, cli, monkeypatch):
-    monkeypatch.setattr("hills.runtime.detect", lambda: None)
+    monkeypatch.setattr("hills.runtime.detect", lambda *a, **k: None)
     _image_hill(project, cli)
     sub = project / "attempt"
     sub.mkdir()
@@ -169,7 +203,7 @@ def test_eval_without_a_runtime_reports_clearly(project, cli, monkeypatch):
 
 
 def test_check_without_a_runtime_records_a_dependency_failure(project, cli, monkeypatch):
-    monkeypatch.setattr("hills.runtime.detect", lambda: None)
+    monkeypatch.setattr("hills.runtime.detect", lambda *a, **k: None)
     _image_hill(project, cli)
     result = check(Hill.resolve("demo"))
     assert not result.ok

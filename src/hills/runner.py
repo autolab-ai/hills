@@ -195,9 +195,17 @@ def _run_evaluator(hill, hill_root, run_dir, submission, params, final, env_key,
             runtime_name = runtime.require()
         except HillsError as error:
             return None, str(error)
-        warm, warm_output = runtime.ensure_image(runtime_name, image, log_path=run_dir / "env.log")
+        if stream:
+            # Make the image-prep phase visible in the node's run log instead of
+            # a blank pane while a multi-GB image downloads on first use.
+            print(f"hills: preparing evaluator image {image} ...", flush=True)
+        warm, warm_output = runtime.ensure_image(
+            runtime_name, image, log_path=run_dir / "env.log", stream=stream
+        )
         if warm != 0:
             return None, f"could not pull the hill's image {image}:\n{warm_output.strip()}"
+        if stream:
+            print("hills: image ready; starting the evaluator", flush=True)
         # run_dir (rw) holds the shim, invocation, submission, result.json and,
         # for an official run, the materialized hill. Bind whatever else the
         # evaluator needs at its own path so the absolute paths in

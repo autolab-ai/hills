@@ -50,7 +50,7 @@ environment:
 
 The image provides Python (the shim is standard-library only) and your
 toolchain; there is no uv sync for image hills. `hills eval` and `hills check`
-run inside it via docker or podman locally, apptainer on HPC. A hill without an
+run inside it via docker or podman locally, apptainer or singularity on HPC (they run a `docker://` image directly). Auto-detected, or forced with `--runtime` / `HILLS_RUNTIME`. A hill without an
 `environment` runs in the uv environment exactly as before.
 
 **`eval.py`** is one function:

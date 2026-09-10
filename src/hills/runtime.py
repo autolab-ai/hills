@@ -2,8 +2,17 @@
 
 Used when a hill's manifest sets ``environment.image``. The tool never builds
 images; it runs the evaluator inside a prebuilt one, using whatever runtime the
-machine has. docker and podman take the same flags; apptainer runs OCI images
-via ``docker://`` and binds explicitly.
+machine has. docker and podman take the same flags; apptainer and singularity
+(its sibling — same CLI) run the OCI image via the ``docker://`` transport and
+bind explicitly, converting the image on the fly.
+
+Which runtime is used is auto-detected (docker, then podman, then apptainer /
+singularity), but the caller decides the policy: pass ``--runtime`` on the CLI
+or set ``HILLS_RUNTIME`` in the environment (the platform sets it per node) to
+force one. The tool stays mechanism-only — it never guesses a runtime from the
+hill, and never configures storage; that is the caller's job (e.g. point
+podman's store at node-local disk via ``CONTAINERS_STORAGE_CONF`` when the home
+is on NFS).
 
 Paths are bound at their own absolute location (``host:host``, without resolving
 symlinks) so the absolute paths the runner writes into invocation.json resolve
@@ -21,16 +30,21 @@ from pathlib import Path
 from hills import proc
 from hills.errors import HillsError
 
-# Order of preference. podman is a drop-in for docker; apptainer is the HPC path.
-RUNTIMES = ("docker", "podman", "apptainer")
+# Order of auto-detect preference. podman is a drop-in for docker; apptainer and
+# singularity are the HPC path (daemonless, run a docker:// image directly).
+RUNTIMES = ("docker", "podman", "apptainer", "singularity")
+# Daemonless runtimes: no background daemon, run an image as the current process,
+# and share the same `exec --cleanenv --no-eval --pwd --bind --env` CLI.
+_DAEMONLESS = ("apptainer", "singularity")
 _READY_TIMEOUT_S = 20
 
 
 def _usable(name: str) -> bool:
     """A runtime is usable only if it can actually run: for docker and podman
     that means the daemon or backend answers, not merely that the client exists.
-    apptainer has no daemon, so presence is enough."""
-    if name == "apptainer":
+    A daemonless runtime (apptainer/singularity) has no daemon, so presence is
+    enough."""
+    if name in _DAEMONLESS:
         return True
     try:
         result = subprocess.run(
@@ -41,21 +55,44 @@ def _usable(name: str) -> bool:
         return False
 
 
-def detect() -> str | None:
+def detect(preferred: str | None = None) -> str | None:
+    """The runtime to use, or None if none is available.
+
+    ``preferred`` (from ``--runtime`` or, if unset, the ``HILLS_RUNTIME`` env)
+    forces a specific runtime: it is returned when it is on PATH and usable, and
+    otherwise nothing else is substituted for it (an explicit choice that can't
+    run is an error the caller should see, via :func:`require`). With no
+    preference, the first usable runtime in :data:`RUNTIMES` wins.
+    """
+    preferred = preferred or os.environ.get("HILLS_RUNTIME") or None
+    if preferred:
+        if preferred not in RUNTIMES:
+            return None
+        return preferred if (shutil.which(preferred) and _usable(preferred)) else None
     for name in RUNTIMES:
         if shutil.which(name) and _usable(name):
             return name
     return None
 
 
-def require() -> str:
-    runtime = detect()
-    if runtime is None:
+def require(preferred: str | None = None) -> str:
+    preferred = preferred or os.environ.get("HILLS_RUNTIME") or None
+    runtime = detect(preferred)
+    if runtime is not None:
+        return runtime
+    if preferred:
+        if preferred not in RUNTIMES:
+            raise HillsError(
+                f"unknown container runtime {preferred!r}; choose one of "
+                + ", ".join(RUNTIMES)
+            )
         raise HillsError(
-            "this hill declares environment.image, which needs a working container runtime "
-            "(docker, podman, or apptainer) on PATH; none was found or reachable."
+            f"the requested container runtime {preferred!r} is not on PATH or not usable."
         )
-    return runtime
+    raise HillsError(
+        "this hill declares environment.image, which needs a working container runtime "
+        "(docker, podman, apptainer, or singularity) on PATH; none was found or reachable."
+    )
 
 
 def _abs(path) -> str:
@@ -68,7 +105,7 @@ def _bind_flags(runtime: str, binds: list[tuple[Path, bool]]) -> list[str]:
     flags: list[str] = []
     for host, read_only in binds:
         spec = _abs(host)
-        if runtime == "apptainer":
+        if runtime in _DAEMONLESS:
             flags += ["--bind", f"{spec}:{spec}" + (":ro" if read_only else "")]
         else:
             flags += ["-v", f"{spec}:{spec}" + (":ro" if read_only else ":rw")]
@@ -76,9 +113,10 @@ def _bind_flags(runtime: str, binds: list[tuple[Path, bool]]) -> list[str]:
 
 
 def _image_ref(runtime: str, image: str) -> str:
-    if runtime != "apptainer":
+    if runtime not in _DAEMONLESS:
         return image
-    # apptainer runs an OCI image via the docker:// transport, or a local .sif.
+    # apptainer/singularity run an OCI image via the docker:// transport, or a
+    # local .sif / explicit URI verbatim.
     if "://" in image or image.endswith(".sif"):
         return image
     return f"docker://{image}"
@@ -117,8 +155,9 @@ def build_command(
             command += ["-e", f"{key}={value}"]
         command += [image, *argv[1:]]
         return command
-    # apptainer: a clean environment (no host PYTHON*), no host env evaluation.
-    command = ["apptainer", "exec", "--cleanenv", "--no-eval", "--pwd", workdir_s]
+    # apptainer / singularity: a clean environment (no host PYTHON*), no host
+    # env evaluation. The CLI name IS the runtime, so both work unchanged.
+    command = [runtime, "exec", "--cleanenv", "--no-eval", "--pwd", workdir_s]
     command += _bind_flags(runtime, binds)
     for key, value in env.items():
         command += ["--env", f"{key}={value}"]
@@ -126,12 +165,16 @@ def build_command(
     return command
 
 
-def ensure_image(runtime: str, image: str, *, log_path: Path | None = None) -> tuple[int, str]:
+def ensure_image(
+    runtime: str, image: str, *, log_path: Path | None = None, stream: bool = False
+) -> tuple[int, str]:
     """Make the image available before the timed run, so the watchdog does not
     count a first-time download or OCI-to-SIF conversion.
 
     Pulls only when the image is not already present, so a locally built image
-    and offline cached digests both work.
+    and offline cached digests both work. With ``stream=True`` the pull /
+    OCI->SIF download progress is echoed live (to the run log a node captures),
+    so a long first-time fetch is visible instead of a blank log.
     """
     if runtime in ("docker", "podman"):
         present = subprocess.run(
@@ -139,11 +182,12 @@ def ensure_image(runtime: str, image: str, *, log_path: Path | None = None) -> t
         )
         if present.returncode == 0:
             return 0, ""
-        return proc.stream_run([runtime, "pull", image], log_path=log_path)
-    # apptainer: warm the OCI->SIF cache with a no-op exec (untimed).
+        return proc.stream_run([runtime, "pull", image], log_path=log_path, stream=stream)
+    # apptainer / singularity: warm the OCI->SIF cache with a no-op exec (untimed).
     return proc.stream_run(
-        ["apptainer", "exec", "--cleanenv", "--no-eval", _image_ref(runtime, image), "true"],
+        [runtime, "exec", "--cleanenv", "--no-eval", _image_ref(runtime, image), "true"],
         log_path=log_path,
+        stream=stream,
     )
 
 
@@ -163,7 +207,8 @@ def run(
 
     For docker and podman the container gets a name and is force-removed on
     timeout, since killing the client's process group does not stop a
-    daemon-managed container.
+    daemon-managed container. A daemonless runtime runs as the current process,
+    so killing the process group is enough.
     """
     runtime = runtime or require()
     command = build_command(runtime, image, argv, workdir=workdir, binds=binds, env=env)

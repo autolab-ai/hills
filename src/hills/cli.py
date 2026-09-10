@@ -1,6 +1,7 @@
 """The hills command line. Unitary, git-style, fully local and offline."""
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -12,6 +13,7 @@ from hills import (
     paths,
     report as report_mod,
     runner,
+    runtime as runtime_mod,
     scaffold,
     setup_cmd,
     state,
@@ -69,6 +71,7 @@ def cmd_new(args) -> int:
 
 
 def cmd_check(args) -> int:
+    _apply_runtime_override(args)
     hill = Hill.resolve(args.name)
     result = check_mod.check(hill, run_tests=not args.no_tests)
     if args.json:
@@ -207,7 +210,17 @@ def cmd_describe(args) -> int:
     return 0
 
 
+def _apply_runtime_override(args) -> None:
+    """`--runtime` forces the container runtime for this invocation by setting
+    HILLS_RUNTIME (which runtime.detect honors); the platform can set the env
+    directly per node instead of passing the flag."""
+    chosen = getattr(args, "runtime", None)
+    if chosen:
+        os.environ["HILLS_RUNTIME"] = chosen
+
+
 def cmd_eval(args) -> int:
+    _apply_runtime_override(args)
     hill = Hill.resolve(args.hill)
     outcome = runner.evaluate(
         hill,
@@ -456,6 +469,10 @@ def build_parser() -> argparse.ArgumentParser:
     check = add("check", "validate the manifest and evaluator contract, and run tests/")
     check.add_argument("name")
     check.add_argument("--no-tests", action="store_true", help="skip tests/")
+    check.add_argument(
+        "--runtime", choices=runtime_mod.RUNTIMES,
+        help="force a container runtime for an image hill (else auto-detect; also HILLS_RUNTIME)",
+    )
     check.set_defaults(func=cmd_check)
 
     status = add("status", "working-tree changes since the last commit")
@@ -489,6 +506,10 @@ def build_parser() -> argparse.ArgumentParser:
     mode.add_argument("--force", action="store_true", help="evaluate HEAD even though the hill is dirty")
     mode.add_argument("--current", action="store_true", help="evaluate the working tree; report is unofficial")
     evaluate.add_argument("--queue", action="store_true", help="wait for a busy device instead of failing")
+    evaluate.add_argument(
+        "--runtime", choices=runtime_mod.RUNTIMES,
+        help="force a container runtime for an image hill (else auto-detect; also HILLS_RUNTIME)",
+    )
     evaluate.add_argument("-v", "--verbose", action="store_true", help="stream evaluator output")
     evaluate.add_argument("-o", "--out", help="also write the report to this path")
     evaluate.set_defaults(func=cmd_eval)
