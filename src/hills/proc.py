@@ -4,6 +4,7 @@ Shared by the uv path (``uvenv``) and the container path (``runtime``) so both
 stream, log, and reap identically.
 """
 
+import contextlib
 import os
 import signal
 import subprocess
@@ -67,16 +68,24 @@ def stream_run(
 
 
 def terminate_group(process: subprocess.Popen) -> None:
-    """Kill the process and everything it launched."""
-    for sig in (signal.SIGTERM, signal.SIGKILL):
-        if process.poll() is not None:
-            return
-        try:
-            os.killpg(os.getpgid(process.pid), sig)
-        except ProcessLookupError:
-            return
-        try:
-            process.wait(timeout=5)
-            return
-        except subprocess.TimeoutExpired:
-            continue
+    """Kill the process AND its whole group: SIGTERM, a grace period, then
+    SIGKILL any survivors — regardless of whether the group leader already
+    exited. Returning as soon as the leader dies (the old behavior) left
+    children that ignore SIGTERM, or that the leader spawned, running. The group
+    id is captured up front so a leader that exits mid-way can't hide it."""
+    try:
+        pgid = os.getpgid(process.pid)
+    except ProcessLookupError:
+        return
+
+    def _sig(sig: int) -> None:
+        with contextlib.suppress(ProcessLookupError):
+            os.killpg(pgid, sig)
+
+    _sig(signal.SIGTERM)
+    with contextlib.suppress(subprocess.TimeoutExpired):
+        process.wait(timeout=5)
+    # KILL any process still in the group, even if the leader already exited.
+    _sig(signal.SIGKILL)
+    with contextlib.suppress(subprocess.TimeoutExpired):
+        process.wait(timeout=5)
