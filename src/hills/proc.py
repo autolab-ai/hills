@@ -8,6 +8,7 @@ import contextlib
 import os
 import signal
 import subprocess
+import time
 import sys
 import threading
 from pathlib import Path
@@ -83,9 +84,17 @@ def terminate_group(process: subprocess.Popen) -> None:
             os.killpg(pgid, sig)
 
     _sig(signal.SIGTERM)
-    with contextlib.suppress(subprocess.TimeoutExpired):
-        process.wait(timeout=5)
-    # KILL any process still in the group, even if the leader already exited.
+    # Give the WHOLE group the grace period to exit — not just the leader.
+    # Polling `killpg(pgid, 0)` (signal 0 = existence check) means a child that
+    # needs a moment to clean up isn't SIGKILLed the instant the leader dies.
+    deadline = time.monotonic() + 5.0
+    while time.monotonic() < deadline:
+        try:
+            os.killpg(pgid, 0)
+        except ProcessLookupError:
+            break  # group is gone
+        time.sleep(0.1)
+    # KILL any survivors, even if the leader already exited.
     _sig(signal.SIGKILL)
     with contextlib.suppress(subprocess.TimeoutExpired):
         process.wait(timeout=5)
