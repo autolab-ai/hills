@@ -296,3 +296,22 @@ def test_host_python_skips_the_launcher_venv(monkeypatch, tmp_path):
     # Explicit override wins.
     monkeypatch.setenv("HILLS_HOST_PYTHON", "/opt/py/bin/python")
     assert runner._host_python() == "/opt/py/bin/python"
+
+
+def test_host_runtime_via_shim_launcher(project, cli, monkeypatch, capsys):
+    # The shim-adapter path: HILLS_SHIM_LAUNCHER prefixes the shim command (here
+    # a no-op `env` standing in for `kube run … --`), so the evaluator runs via
+    # the launcher rather than a nested container — and still no runtime needed.
+    import json
+
+    monkeypatch.setenv("HILLS_RUNTIME", "host")
+    monkeypatch.setenv("HILLS_SHIM_LAUNCHER", "env")  # runs the command as-is
+    monkeypatch.setattr("hills.runtime.detect", lambda *a, **k: None)
+    hill = _image_hill(project, cli)
+    (hill / "eval.py").write_text(REAL_EVAL)
+    sub = project / "attempt"
+    sub.mkdir()
+    (sub / "solution.json").write_text('{"value": 13}')
+    assert cli("eval", str(sub), "-H", "demo", "--current") == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report["metrics"][0]["value"] == 13.0

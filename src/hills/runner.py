@@ -2,6 +2,7 @@
 
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -225,11 +226,26 @@ def _run_evaluator(hill, hill_root, run_dir, submission, params, final, env_key,
         # nested container. The shim is stdlib-only; eval.py's deps and tools
         # come from the ambient image. This is what makes image hills work on
         # hosts where nesting is impossible (unprivileged pods with no userns).
+        # HILLS_SHIM_LAUNCHER (optional): a command that runs the shim inside the
+        # image ELSEWHERE — e.g. `autolab kube run --image <hill image> --`,
+        # which starts a per-eval pod from the hill's image and runs the
+        # stdlib-only shim in it over a shared volume. hills stays on the caller
+        # (materialize, snapshot, validate, sign) and only the shim crosses into
+        # the image; nothing installs hills or a runtime in the pod. When unset,
+        # the current environment IS the image (a rented pod booted from it) and
+        # the shim runs directly under the image's own python.
+        launcher = (os.environ.get("HILLS_SHIM_LAUNCHER") or "").strip()
+        if launcher:
+            argv = [*shlex.split(launcher), "python", str(shim), str(invocation)]
+            where = "via the shim launcher"
+        else:
+            argv = [_host_python(), str(shim), str(invocation)]
+            where = "in-image (runtime=host)"
         if stream:
-            print("hills: running the evaluator in-image (runtime=host)", flush=True)
+            print(f"hills: running the evaluator {where}", flush=True)
         try:
             code, output = proc.stream_run(
-                [_host_python(), str(shim), str(invocation)],
+                argv,
                 cwd=run_dir,
                 env={**os.environ, **extra_env},
                 timeout=timeout,
