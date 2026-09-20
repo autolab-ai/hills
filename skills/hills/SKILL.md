@@ -208,7 +208,10 @@ become checks in the evaluator or reported config; held-out data moves to
    what it may not do at all. Then the task and what it stands in for, submission
    format, how the metric is computed, params, and a short "what the evaluator
    will not do". The climber gets its search space from this file and nowhere
-   else, so anything you leave out is not a rule.
+   else, so anything you leave out is not a rule. It is also the first thing a
+   person reads about the hill, so write it for them: say the task and what the
+   metric stands in for in plain terms, no bare parameters or code symbols a
+   reader can't decode, no AI-slop prose. Make it read like a person wrote it.
 5. **Write an example submission and tests.** `examples/` proves the format;
    `tests/` stops the evaluator drifting. `from hills import run_evaluator` makes
    a test three lines; turn expensive params down there.
