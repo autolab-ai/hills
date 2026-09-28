@@ -51,18 +51,21 @@ def parse_pointer(data: bytes) -> LfsPointer | None:
     if not lines:
         return None
 
+    # The spec fixes the first line as `version <url>`. Anything else is simply not
+    # a pointer -- return None rather than raising, so this is safe to call on every
+    # blob (README text, code) to detect a pointer without false "malformed" errors.
+    if lines[0] != f"version {POINTER_VERSION}":
+        return None
+
     kv: dict[str, str] = {}
     for line in lines:
         key, sep, val = line.partition(" ")
         if not sep or not key:
-            # Not "key value": this is not a canonical pointer line.
-            return None
+            raise LfsError("git-LFS pointer has a malformed line (expected 'key value')")
         if key in kv:
             raise LfsError("git-LFS pointer has a duplicate key")
         kv[key] = val
 
-    if kv.get("version") != POINTER_VERSION:
-        return None  # not a (recognized) pointer
     if any(k.startswith("ext-") for k in kv):
         raise LfsError("git-LFS extension pointers (ext-*) are not supported")
     unknown = set(kv) - _ALLOWED_KEYS

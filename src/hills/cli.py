@@ -60,9 +60,12 @@ def _format_config(config: list[dict]) -> str:
 
 def cmd_new(args) -> int:
     hill = scaffold.new(args.name, template=args.template)
+    git_dir = ".git" if hill.is_lfs() else ".vc"
     out(f"created {hill.root}")
     out(f"  template   {args.template}")
-    out(f"  version control  {hill.root / '.vc'} (empty; nothing committed yet)")
+    out(f"  version control  {hill.root / git_dir} (empty; nothing committed yet)")
+    if hill.is_lfs():
+        out("  storage    git-LFS for data/ and private/ (see .gitattributes)")
     out("")
     out("Next: fill in README.md, eval.py and hill.yaml, then")
     out(f"  hills check {hill.name}")
@@ -148,6 +151,24 @@ def cmd_commit(args) -> int:
     if not result.ok:
         out("")
         raise HillsError("check failed; nothing was committed")
+
+    if hill.is_lfs():
+        # Spec 4: an ordinary git repo with git-LFS. Stage everything, then verify
+        # every filter=lfs file is a pointer (not raw bytes) before freezing it.
+        hill.vc.ensure_identity()
+        hill.vc.run("add", "-A")
+        lfs_objects = hill.verify_staged_lfs_pointers()
+        tree_hash = hill.vc.commit(args.message, [])
+        total = sum(size for _, size in lfs_objects)
+        out("")
+        out(f"  git-LFS       {len(lfs_objects)} object(s), {total:,} bytes")
+        out("")
+        out(f"committed {hill.name} {hill.manifest.version}")
+        out(f"  tree hash  {tree_hash}")
+        out(f"  commit     {hill.vc.commit_hash()}")
+        out("")
+        out("Scores from here on are tied to this tree hash. A new commit starts a fresh history.")
+        return 0
 
     private_lock, blobs_lock = locks.write(hill.root, hill.manifest)
     hill.refresh_exclude()

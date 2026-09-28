@@ -1,9 +1,11 @@
 """`hills new`: create a hill from a template and init its version control. No questions asked."""
 
 import re
+import shutil
+import subprocess
 from pathlib import Path
 
-from hills import paths
+from hills import manifest as manifest_mod, paths
 from hills.errors import HillsError
 from hills.hill import Hill
 from hills.vc import VC
@@ -26,6 +28,31 @@ HILL_GITIGNORE = """\
 .venv/
 __pycache__/
 """
+
+# A modern (spec-4) hill is an ordinary git repo, so its own .gitignore is checked
+# in. It must not exclude data/ or private/ (those are the LFS-tracked payload).
+MODERN_HILL_GITIGNORE = """\
+.venv/
+__pycache__/
+"""
+
+
+def _ensure_git_lfs(root: Path) -> None:
+    """Register git-LFS filters + hooks in this repo so `filter=lfs` paths are
+    stored as pointers on commit. Spec-4 authoring requires the git-lfs binary."""
+    if shutil.which("git-lfs") is None:
+        raise HillsError(
+            "git-lfs is not installed, but this hill stores its dataset with git-LFS.\n"
+            "Install it (https://git-lfs.com) and re-run, e.g.:\n"
+            "  # Debian/Ubuntu: sudo apt-get install git-lfs\n"
+            "  # macOS:         brew install git-lfs"
+        )
+    subprocess.run(
+        ["git", "-C", str(root), "lfs", "install", "--local"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
 
 
 def template_paths() -> dict[str, Path]:
@@ -125,10 +152,20 @@ def new(name: str, *, template: str = DEFAULT_TEMPLATE, where: Path | None = Non
 
     _copy_template(template, root, name)
     _rename(root, name)
-    (root / ".gitignore").write_text(HILL_GITIGNORE)
     (root / "private").mkdir(exist_ok=True)
 
-    VC(root).init()
+    # The template's spec version chooses the layout: spec 4 is an ordinary git
+    # repo with git-LFS; earlier specs use the legacy .vc + blob-lock mechanism.
+    spec_version = manifest_mod.load(root / "hill.yaml").spec_version
+    vc = VC(root)
+    if spec_version >= manifest_mod.LFS_SPEC_VERSION:
+        (root / ".gitignore").write_text(MODERN_HILL_GITIGNORE)
+        vc.init_modern()
+        _ensure_git_lfs(root)
+        return Hill.at(root)
+
+    (root / ".gitignore").write_text(HILL_GITIGNORE)
+    vc.init()
     hill = Hill.at(root)
     hill.refresh_exclude()
     return hill

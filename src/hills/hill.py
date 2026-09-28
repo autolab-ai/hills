@@ -61,16 +61,58 @@ class Hill:
     # -- version control --------------------------------------------------
 
     def refresh_exclude(self) -> None:
-        """Keep git's view in step with what the manifest says is lock-tracked."""
-        if self.vc.initialized:
+        """Keep git's view in step with what the manifest says is lock-tracked.
+
+        Legacy (.vc) hills only: spec-4 hills use git-LFS and .gitattributes, and a
+        modern .git repo is treated as read-only during eval, so it is never touched.
+        """
+        if self.vc.initialized and self.vc.legacy:
             self.vc.write_exclude(locks.blob_paths(self.root, self.manifest))
 
     def require_vc(self) -> None:
         if not self.vc.initialized:
             raise HillsError(
-                f"{self.root} has no .vc, so it is not a versioned hill. "
-                "Hills are created by `hills new`."
+                f"{self.root} has no version control (.git or .vc), so it is not a "
+                "versioned hill. Hills are created by `hills new`."
             )
+
+    def is_lfs(self) -> bool:
+        return self.manifest.spec_version >= manifest_mod.LFS_SPEC_VERSION
+
+    def verify_staged_lfs_pointers(self) -> list[tuple[str, int]]:
+        """Before a spec-4 commit: every nonempty ``filter=lfs`` staged file must be a
+        canonical git-LFS pointer. Otherwise the raw bytes would be committed into git
+        (LFS filters were not active when the file was added), silently defeating the
+        whole point. Returns (path, size) per LFS object, for reporting.
+        """
+        from hills import lfs
+
+        staged = self.vc.staged_files()
+        filters = self.vc.working_attr_filter(staged)
+        objects: list[tuple[str, int]] = []
+        raw: list[str] = []
+        for path in staged:
+            if filters.get(path) != "lfs":
+                continue
+            blob = self.vc.staged_blob_bytes(path)
+            if not blob:
+                continue  # an empty file is fine as-is
+            pointer = lfs.parse_pointer(blob)
+            if pointer is None:
+                raw.append(path)
+            else:
+                objects.append((path, pointer.size))
+        if raw:
+            listed = "\n".join(f"  {p}" for p in raw)
+            raise HillsError(
+                "these files are marked filter=lfs but were committed as raw bytes, not "
+                f"git-LFS pointers:\n{listed}\n\n"
+                "git-LFS was not active when they were staged. Fix with:\n"
+                "  git lfs install --local\n"
+                "  git rm --cached <path> && git add <path>\n"
+                "then commit again."
+            )
+        return objects
 
     def require_commits(self) -> None:
         self.require_vc()
@@ -115,13 +157,23 @@ class Hill:
     # -- materialization --------------------------------------------------
 
     def materialize(self, dest: Path) -> Path:
-        """Lay out the committed version at HEAD in dest, with locked content linked in.
+        """Lay out the committed version at HEAD in dest.
 
-        Everything in git is extracted. Private files and lock-tracked blobs are
-        symlinked from the live hill after being verified against the locks, so
-        an evaluation never copies gigabytes and never sees uncommitted content.
+        The materializer is chosen by the manifest's spec version, not by which git
+        dir or attributes are present: spec 4 hills store big files as git-LFS
+        objects, everything before that used the blob/private lock mechanism.
         """
         self.require_commits()
+        if self.manifest.spec_version >= manifest_mod.LFS_SPEC_VERSION:
+            from hills.materialize import materialize_lfs
+
+            commit = self.vc.resolve_commit("HEAD")
+            return materialize_lfs(self, commit, dest)
+        return self._materialize_legacy_locks(dest)
+
+    def _materialize_legacy_locks(self, dest: Path) -> Path:
+        """Spec 1-3: extract the git tree and symlink lock-verified private/blob files,
+        so an evaluation never copies gigabytes and never sees uncommitted content."""
         head_private, head_blobs = self.head_locks()
         locks.verify(self.root, head_private, locks.private_paths(self.root))
         locks.verify(self.root, head_blobs, locks.blob_paths(self.root, self.manifest))

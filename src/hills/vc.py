@@ -261,6 +261,45 @@ class VC:
             out[path] = "" if value in ("unspecified", "unset") else value
         return out
 
+    # -- staged inspection (spec-4 commit-time LFS safety) ------------------
+
+    def staged_files(self) -> list[str]:
+        """Paths currently staged for commit (added/modified vs HEAD, or all on the
+        first commit)."""
+        args = ["diff", "--cached", "--name-only", "-z", "--diff-filter=ACMR"]
+        if self.has_commits:
+            raw = self.run_bytes(*args)
+        else:
+            raw = self.run_bytes(*args, "--", ".")
+        return [p.decode("utf-8") for p in raw.split(b"\x00") if p]
+
+    def staged_blob_bytes(self, path: str) -> bytes:
+        """Raw bytes of a path's staged blob (a POINTER for a correctly-tracked LFS
+        file; the real bytes if LFS did not run)."""
+        return self.run_bytes("cat-file", "blob", f":{path}")
+
+    def working_attr_filter(self, paths: list[str]) -> dict[str, str]:
+        """The ``filter`` gitattribute per path from the working tree's .gitattributes
+        (used pre-commit, before there is a source commit to read from)."""
+        if not paths:
+            return {}
+        stdin = ("\0".join(paths) + "\0").encode()
+        result = subprocess.run(
+            self._base() + ["check-attr", "-z", "filter", "--stdin"],
+            cwd=self.root,
+            input=stdin,
+            capture_output=True,
+        )
+        if result.returncode != 0:
+            raise HillsError("git check-attr failed:\n" + result.stderr.decode("utf-8", "replace"))
+        fields = result.stdout.split(b"\x00")
+        out: dict[str, str] = {}
+        for i in range(0, len(fields) - 2, 3):
+            path = fields[i].decode("utf-8")
+            value = fields[i + 2].decode("utf-8")
+            out[path] = "" if value in ("unspecified", "unset") else value
+        return out
+
     def archive_to(self, dest: Path) -> None:
         """Extract the committed tree at HEAD into dest (LEGACY only)."""
         dest.mkdir(parents=True, exist_ok=True)

@@ -11,7 +11,12 @@ from hills.errors import ManifestError
 # The manifest contract this tool reads, named by `spec_version` in hill.yaml.
 # A spec version fixes the set of keys hill.yaml may contain and the evaluator
 # contract; changing either, even by adding an optional key, is a new version.
-SUPPORTED_SPEC_VERSION = 3
+SUPPORTED_SPEC_VERSION = 4
+
+# Spec 4 stores large files as git-LFS objects (pointers in the tree, bytes in
+# object storage) instead of the blob/private lock mechanism, so it retires the
+# `blobs` field. Materialization is chosen off this version (see hill.materialize).
+LFS_SPEC_VERSION = 4
 
 NAME_RE = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
 VERSION_RE = re.compile(r"^\d+\.\d+\.\d+([.-][0-9A-Za-z.-]+)?$")
@@ -164,9 +169,10 @@ class Manifest:
             "spec_version": self.spec_version,
             "watchdog_timeout_s": self.watchdog_timeout_s,
             "params": {name: spec.as_json() for name, spec in self.params.items()},
-            "blobs": self.blobs.as_json(),
             "exclusive": self.exclusive,
         }
+        if self.spec_version < LFS_SPEC_VERSION:
+            out["blobs"] = self.blobs.as_json()
         if self.spec_version >= 2:
             out["metrics"] = [metric.as_json() for metric in self.metrics]
         if self.spec_version >= 3 and self.environment is not None:
@@ -288,15 +294,22 @@ def parse(data, source: str = "hill.yaml") -> Manifest:
     # "upgrade hills", never with "unknown keys".
     spec_version = _parse_spec_version(data, source)
 
+    if spec_version >= LFS_SPEC_VERSION and "blobs" in data:
+        raise ManifestError(
+            f"{source}: spec version {spec_version} stores large files with git-LFS, so the "
+            "`blobs` field is gone. Track big files in .gitattributes (filter=lfs) instead."
+        )
+
     known = {
         "name",
         "version",
         "spec_version",
         "watchdog_timeout_s",
         "params",
-        "blobs",
         "exclusive",
     }
+    if spec_version < LFS_SPEC_VERSION:
+        known.add("blobs")  # retired in spec 4 (git-LFS replaces the blob locks)
     if spec_version >= 2:
         known.add("metrics")
     if spec_version >= 3:

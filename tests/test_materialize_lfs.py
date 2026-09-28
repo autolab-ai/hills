@@ -32,6 +32,13 @@ def _repo(tmp_path: Path) -> Path:
     _git(root, "config", "user.email", "t@t")
     _git(root, "config", "user.name", "t")
     _git(root, "config", "commit.gpgsign", "false")
+    # These tests commit pointer TEXT by hand to simulate the post-clean state, so
+    # git-LFS filters must be off (they would otherwise rewrite blobs on `git add`
+    # wherever git-lfs is installed globally). This keeps the tests hermetic.
+    _git(root, "config", "filter.lfs.clean", "cat")
+    _git(root, "config", "filter.lfs.smudge", "cat")
+    _git(root, "config", "filter.lfs.process", "")
+    _git(root, "config", "filter.lfs.required", "false")
     return root
 
 

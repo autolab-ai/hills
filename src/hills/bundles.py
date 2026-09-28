@@ -214,6 +214,12 @@ def bundle(
 ) -> tuple[BundleManifest, Path]:
     """Write the hill at HEAD, with its locked content, to one `.hill.tar`."""
     hill.require_commits()
+    if hill.is_lfs():
+        raise BundleError(
+            f"{hill.name} is a spec-{hill.manifest.spec_version} hill: it is distributed as a "
+            "git repository with git-LFS, not a bundle. Push it to AutoLab (or `git clone` + "
+            "`git lfs pull`) instead of `hills bundle`."
+        )
     hill.refresh_exclude()
     _require_clean(hill, force=force)
 

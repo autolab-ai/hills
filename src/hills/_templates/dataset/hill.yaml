@@ -1,0 +1,23 @@
+spec_version: 4
+name: __NAME__
+version: 0.1.0
+
+# What the evaluator reports, in ranking order: every passing report must start
+# with exactly these, and ranking is lexicographic in this order.
+metrics:
+  - {name: score, direction: max}
+
+# Hard kill for a hung evaluator. Not a semantic time limit: if your task has a
+# time budget, enforce it inside eval.py, which owns the official clock.
+watchdog_timeout_s: 600
+
+# Typed knobs the tool validates and passes to eval() as keyword arguments.
+params:
+  tolerance: {type: float, default: 1.0e-6, min: 0.0}
+
+# Large files (this hill's dataset) are stored with git-LFS: their pointers live
+# in git (so they are part of the tree hash) and their bytes live in AutoLab's
+# object storage. Mark which paths are LFS in .gitattributes, not here. To run
+# the evaluator inside a container image, add:
+# environment:
+#   image: ghcr.io/you/your-image@sha256:...   # pin by digest, not a mutable tag
