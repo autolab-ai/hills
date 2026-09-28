@@ -192,6 +192,12 @@ and `hills examples` lists the examples you can start from, such as
 `nanogpt-10min`: a timed training run scored on a held-out split the agent
 never sees.
 
+**Hills with datasets.** `hills new <name> -t dataset` scaffolds a hill whose
+`data/` and `private/` files are tracked with git-LFS (needs the `git-lfs`
+binary). The pointers live in git, so they are part of the tree hash; the bytes
+live in LFS. `eval.py` reads the files from `data/` directly, and the tool
+checksum-verifies each one against its pointer before scoring.
+
 <a id="running-a-loop-you-are-not-watching"></a>
 
 ## Running a loop you are not watching
