@@ -36,24 +36,35 @@ def test_extension_pointer_rejected():
         parse_pointer(data)
 
 
-def test_malformed_pointer_raises():
-    # declares the version but has a bad oid
-    with pytest.raises(LfsError):
-        parse_pointer(b"version https://git-lfs.github.com/spec/v1\noid sha256:xyz\nsize 10\n")
-    # bad size
-    with pytest.raises(LfsError):
+def test_noncanonical_pointers_return_none():
+    """Anything but the unique canonical serialization is not a pointer (None), so
+    detection is safe on arbitrary blobs; the caller hard-fails a filter=lfs path
+    whose blob is not a canonical pointer."""
+    h = "a" * 64
+    b = "b" * 64
+    noncanonical = [
+        b"version https://git-lfs.github.com/spec/v1\noid sha256:xyz\nsize 10\n",  # bad oid
+        f"version https://git-lfs.github.com/spec/v1\noid sha256:{h}\nsize NaN\n".encode(),  # size
+        f"version https://git-lfs.github.com/spec/v1\noid sha256:{h}\nsize 1\nx y\n".encode(),  # key
+        f"version https://git-lfs.github.com/spec/v1\noid sha256:{h}\noid sha256:{b}\nsize 1\n".encode(),  # dup
+        f"version https://git-lfs.github.com/spec/v1\noid sha256:{h}\nsize 1".encode(),  # no final LF
+        f"version https://git-lfs.github.com/spec/v1\nsize 1\noid sha256:{h}\n".encode(),  # order
+        f"version https://git-lfs.github.com/spec/v1\noid sha256:{h}\nsize +1\n".encode(),  # signed
+        f"version https://git-lfs.github.com/spec/v1\noid sha256:{h}\nsize -0\n".encode(),  # signed
+        f"version https://git-lfs.github.com/spec/v1\noid sha256:{h}\nsize 01\n".encode(),  # leading 0
+    ]
+    for data in noncanonical:
+        assert parse_pointer(data) is None, data
+
+
+def test_extension_pointer_raises():
+    """An ext-* pointer IS a recognizable pointer but its oid may not equal the
+    smudged bytes, so it must never be silently treated as data."""
+    h = "a" * 64
+    with pytest.raises(LfsError, match="extension"):
         parse_pointer(
-            f"version https://git-lfs.github.com/spec/v1\noid sha256:{'a'*64}\nsize NaN\n".encode()
-        )
-    # unknown key
-    with pytest.raises(LfsError, match="unexpected keys"):
-        parse_pointer(
-            f"version https://git-lfs.github.com/spec/v1\noid sha256:{'a'*64}\nsize 1\nx y\n".encode()
-        )
-    # duplicate key
-    with pytest.raises(LfsError, match="duplicate"):
-        parse_pointer(
-            f"version https://git-lfs.github.com/spec/v1\noid sha256:{'a'*64}\noid sha256:{'b'*64}\nsize 1\n".encode()
+            f"version https://git-lfs.github.com/spec/v1\next-0-foo sha256:{h}\n"
+            f"oid sha256:{h}\nsize 1\n".encode()
         )
 
 

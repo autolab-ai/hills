@@ -156,7 +156,34 @@ class VC:
         return self.out("rev-parse", "HEAD")
 
     def status_porcelain(self) -> list[str]:
-        return [line for line in self.out("status", "--porcelain").splitlines() if line]
+        # --no-optional-locks: an official eval is read-only; never let `git status`
+        # rewrite .git/index as a side effect.
+        base = self._base()
+        result = subprocess.run(
+            [base[0], "--no-optional-locks", *base[1:], "status", "--porcelain"],
+            cwd=self.root,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            raise HillsError(f"git status failed in {self.root}:\n{result.stderr.strip()}")
+        return [line for line in result.stdout.splitlines() if line]
+
+    def assert_root_is_toplevel(self) -> None:
+        """Fail unless git's working-tree top level is exactly the hill root.
+
+        A modern hill is an ordinary repo; a redirected or linked ``.git`` could pair
+        another repository's tree with this directory's manifest and LFS bytes. Legacy
+        (.vc) hills address the tree explicitly via ``--work-tree``, so this is a no-op
+        there."""
+        if self.legacy:
+            return
+        top = self.out("rev-parse", "--show-toplevel")
+        if not top or Path(top).resolve() != self.root:
+            raise HillsError(
+                f"{self.root}: git top-level is {top!r}, not the hill root; refusing to "
+                "operate on a repository whose working tree is not this hill"
+            )
 
     def is_dirty(self) -> bool:
         return bool(self.status_porcelain())
@@ -278,15 +305,23 @@ class VC:
 
     # -- staged inspection (spec-4 commit-time LFS safety) ------------------
 
-    def staged_files(self) -> list[str]:
-        """Paths currently staged for commit (added/modified vs HEAD, or all on the
-        first commit)."""
-        args = ["diff", "--cached", "--name-only", "-z", "--diff-filter=ACMR"]
-        if self.has_commits:
-            raw = self.run_bytes(*args)
-        else:
-            raw = self.run_bytes(*args, "--", ".")
+    def index_files(self) -> list[str]:
+        """Every path in the index (what a commit would freeze), so the LFS-pointer
+        gate inspects the whole tree -- not only paths changed since HEAD, which would
+        miss an unchanged raw blob newly matched by an added filter=lfs rule."""
+        raw = self.run_bytes("ls-files", "-z")
         return [p.decode("utf-8") for p in raw.split(b"\x00") if p]
+
+    def commit_staged(self, message: str) -> str:
+        """Commit exactly what is in the index, WITHOUT re-staging. Used after the
+        spec-4 LFS gate has verified the staged tree, so nothing can slip in between
+        verification and the commit."""
+        self.ensure_identity()
+        staged = self.run("diff", "--cached", "--quiet", check=False)
+        if staged.returncode == 0 and self.has_commits:
+            raise HillsError("nothing to commit: the hill matches its last committed version")
+        self.run("commit", "--quiet", "-m", message)
+        return self.tree_hash()
 
     def staged_blob_bytes(self, path: str) -> bytes:
         """Raw bytes of a path's staged blob (a POINTER for a correctly-tracked LFS

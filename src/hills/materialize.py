@@ -23,10 +23,11 @@ from hills.errors import HillsError
 
 
 def _copy_verified(src: Path, dst: Path) -> None:
-    """Copy real bytes into the run dir; try reflink (CoW, instant) then fall back."""
+    """Copy real bytes into the run dir; try reflink (CoW, instant) then fall back.
+    The destination's mode is set explicitly by the caller from the committed tree."""
     try:
         subprocess.run(
-            ["cp", "--reflink=auto", "--preserve=mode", str(src), str(dst)],
+            ["cp", "--reflink=auto", str(src), str(dst)],
             check=True,
             capture_output=True,
         )
@@ -37,6 +38,7 @@ def _copy_verified(src: Path, dst: Path) -> None:
 def materialize_lfs(hill, commit: str, dest: Path) -> Path:
     """Lay out ``commit``'s tree in ``dest`` for a spec-4 (git-LFS) hill."""
     vc = hill.vc
+    vc.assert_root_is_toplevel()  # the .git must belong to exactly this hill directory
     dest.mkdir(parents=True, exist_ok=True)
     entries = vc.tree_entries(commit)
     blob_paths = [e.path for e in entries if e.otype == "blob"]
@@ -69,6 +71,10 @@ def materialize_lfs(hill, commit: str, dest: Path) -> Path:
                 src = hill.root / e.path
                 lfs.verify_object(src, pointer)  # working-tree bytes must match the pointer
                 _copy_verified(src, target)
+                # Reverify the COPY: if the source was swapped between hashing and the
+                # copy, the destination bytes would not match the pointer -- catch it
+                # here so an evaluation can never see unverified bytes (TOCTOU).
+                lfs.verify_object(target, pointer)
             else:
                 raise HillsError(
                     f"{e.path}: filter=lfs but the committed blob is not a valid LFS pointer "
@@ -82,7 +88,8 @@ def materialize_lfs(hill, commit: str, dest: Path) -> Path:
                 )
             target.write_bytes(raw)
 
-        if e.mode == "100755":
-            target.chmod(target.stat().st_mode | 0o111)
+        # Reproduce the committed mode exactly (git tracks only 0644 / 0755 for blobs),
+        # independent of the working tree's or the copy's umask-derived mode.
+        target.chmod(0o755 if e.mode == "100755" else 0o644)
 
     return dest

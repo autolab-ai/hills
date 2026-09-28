@@ -19,10 +19,11 @@ from pathlib import Path
 from hills.errors import LfsError
 
 POINTER_VERSION = "https://git-lfs.github.com/spec/v1"
-# The canonical pointer is small; anything larger is not a pointer.
+_VERSION_LINE = f"version {POINTER_VERSION}"
+# The spec requires a pointer to be strictly less than 1024 bytes.
 MAX_POINTER_BYTES = 1024
 _OID_RE = re.compile(r"^sha256:([0-9a-f]{64})$")
-_ALLOWED_KEYS = frozenset({"version", "oid", "size"})
+_SIZE_RE = re.compile(r"^(0|[1-9][0-9]*)$")  # canonical decimal, no sign, no leading zero
 _READ_CHUNK = 1 << 20
 
 
@@ -33,62 +34,57 @@ class LfsPointer:
 
 
 def parse_pointer(data: bytes) -> LfsPointer | None:
-    """Strictly parse a git-LFS pointer blob.
+    """Parse a blob as a git-LFS pointer, accepting ONLY the unique canonical
+    serialization (the spec's normalized form git-lfs itself writes).
 
-    Returns the pointer, or ``None`` if the blob is not a pointer at all. Raises
-    :class:`LfsError` if it *is* a pointer (declares the LFS version) but is
-    malformed, uses an unsupported extension, or carries unknown keys.
+    Returns the pointer, or ``None`` for any blob that is not a canonical basic
+    pointer -- so this is safe to call on arbitrary blobs (README, code) to *detect*
+    a pointer. It raises :class:`LfsError` only for a canonical-looking pointer that
+    uses an unsupported extension (``ext-*``), whose oid may not equal the smudged
+    bytes and so must never be silently treated as data.
+
+    Canonical form (spec): total < 1024 bytes, one entry per line, ``key value`` with a
+    single space, LF line endings incl. a trailing LF, first line ``version``, the
+    remaining keys sorted alphabetically, each key once. Basic pointers carry exactly
+    ``version``/``oid``/``size``; ``oid`` is ``sha256:<64 hex>``; ``size`` is a
+    canonical decimal integer.
     """
-    if not data or len(data) > MAX_POINTER_BYTES:
+    if not data or len(data) >= MAX_POINTER_BYTES:
         return None
     try:
         text = data.decode("utf-8")
     except UnicodeDecodeError:
         return None
-    lines = text.split("\n")
-    if lines and lines[-1] == "":
-        lines = lines[:-1]  # canonical pointers are LF-terminated
-    if not lines:
+    # Must be a pointer (version-first) AND LF-terminated to be canonical.
+    if not text.startswith(_VERSION_LINE + "\n") or not text.endswith("\n"):
         return None
 
-    # The spec fixes the first line as `version <url>`. Anything else is simply not
-    # a pointer -- return None rather than raising, so this is safe to call on every
-    # blob (README text, code) to detect a pointer without false "malformed" errors.
-    if lines[0] != f"version {POINTER_VERSION}":
-        return None
-
-    kv: dict[str, str] = {}
-    for line in lines:
+    kv: list[tuple[str, str]] = []
+    for line in text[:-1].split("\n"):
         key, sep, val = line.partition(" ")
-        if not sep or not key:
-            raise LfsError("git-LFS pointer has a malformed line (expected 'key value')")
-        if key in kv:
-            raise LfsError("git-LFS pointer has a duplicate key")
-        kv[key] = val
+        if not sep or not key or "  " in line or val == "":
+            return None  # not "key value" with a single separating space
+        kv.append((key, val))
 
-    if any(k.startswith("ext-") for k in kv):
+    keys = [k for k, _ in kv]
+    if any(k.startswith("ext-") for k in keys):
         raise LfsError("git-LFS extension pointers (ext-*) are not supported")
-    unknown = set(kv) - _ALLOWED_KEYS
-    if unknown:
-        raise LfsError(f"git-LFS pointer has unexpected keys: {sorted(unknown)}")
+    if keys[0] != "version" or keys[1:] != sorted(keys[1:]):
+        return None  # version must be first; the rest alphabetically sorted
+    mapping = dict(kv)
+    if len(mapping) != len(kv) or set(mapping) != {"version", "oid", "size"}:
+        return None  # duplicate keys, or not exactly the basic-pointer key set
 
-    m = _OID_RE.match(kv.get("oid", ""))
-    if not m:
-        raise LfsError("git-LFS pointer is missing a valid sha256 oid")
-    try:
-        size = int(kv["size"])
-    except (KeyError, ValueError):
-        raise LfsError("git-LFS pointer is missing a valid size") from None
-    if size < 0:
-        raise LfsError("git-LFS pointer has a negative size")
-    return LfsPointer(oid=m.group(1), size=size)
+    oid_match = _OID_RE.match(mapping["oid"])
+    if not oid_match or not _SIZE_RE.match(mapping["size"]):
+        return None
+    return LfsPointer(oid=oid_match.group(1), size=int(mapping["size"]))
 
 
 def looks_like_pointer(data: bytes) -> bool:
     """Cheap check: does the blob declare the LFS pointer version? (Used only to
     flag an ambiguous non-LFS-attributed blob; classification uses gitattributes.)"""
-    head = data[:MAX_POINTER_BYTES]
-    return head.startswith(b"version " + POINTER_VERSION.encode())
+    return data[:MAX_POINTER_BYTES].startswith(_VERSION_LINE.encode())
 
 
 def verify_object(path: Path, pointer: LfsPointer) -> None:

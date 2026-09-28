@@ -153,12 +153,14 @@ def cmd_commit(args) -> int:
         raise HillsError("check failed; nothing was committed")
 
     if hill.is_lfs():
-        # Spec 4: an ordinary git repo with git-LFS. Stage everything, then verify
-        # every filter=lfs file is a pointer (not raw bytes) before freezing it.
+        # Spec 4: an ordinary git repo with git-LFS. Stage everything ONCE, verify every
+        # filter=lfs file in the index is a pointer (not raw bytes), then commit that
+        # exact verified index without re-staging (so nothing slips in after the check).
+        hill.vc.assert_root_is_toplevel()
         hill.vc.ensure_identity()
         hill.vc.run("add", "-A")
         lfs_objects = hill.verify_staged_lfs_pointers()
-        tree_hash = hill.vc.commit(args.message, [])
+        tree_hash = hill.vc.commit_staged(args.message)
         total = sum(size for _, size in lfs_objects)
         out("")
         out(f"  git-LFS       {len(lfs_objects)} object(s), {total:,} bytes")

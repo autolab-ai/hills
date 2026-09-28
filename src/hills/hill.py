@@ -80,14 +80,16 @@ class Hill:
         return self.manifest.spec_version >= manifest_mod.LFS_SPEC_VERSION
 
     def verify_staged_lfs_pointers(self) -> list[tuple[str, int]]:
-        """Before a spec-4 commit: every nonempty ``filter=lfs`` staged file must be a
-        canonical git-LFS pointer. Otherwise the raw bytes would be committed into git
-        (LFS filters were not active when the file was added), silently defeating the
-        whole point. Returns (path, size) per LFS object, for reporting.
+        """Before a spec-4 commit: every nonempty ``filter=lfs`` file in the index must
+        be a canonical git-LFS pointer. Otherwise the raw bytes would be committed into
+        git (LFS filters were not active when the file was added, or an lfs rule was
+        added over an already-staged raw blob), silently defeating the whole point.
+        Inspects the WHOLE index, not only paths changed since HEAD. Returns (path,
+        size) per LFS object, for reporting.
         """
         from hills import lfs
 
-        staged = self.vc.staged_files()
+        staged = self.vc.index_files()
         filters = self.vc.working_attr_filter(staged)
         objects: list[tuple[str, int]] = []
         raw: list[str] = []
@@ -158,19 +160,20 @@ class Hill:
 
     # -- materialization --------------------------------------------------
 
-    def materialize(self, dest: Path) -> Path:
-        """Lay out the committed version at HEAD in dest.
+    def materialize(self, dest: Path, *, commit: str | None = None) -> Path:
+        """Lay out a committed version in dest.
 
-        The materializer is chosen by the manifest's spec version, not by which git
-        dir or attributes are present: spec 4 hills store big files as git-LFS
-        objects, everything before that used the blob/private lock mechanism.
+        ``commit`` pins the exact revision to materialize (resolved once by the caller
+        so tree, attributes, manifest, and reported metadata all come from one commit);
+        it defaults to HEAD. The materializer is chosen by the manifest's spec version,
+        not by which git dir or attributes are present: spec 4 hills store big files as
+        git-LFS objects, everything before that used the blob/private lock mechanism.
         """
         self.require_commits()
         if self.manifest.spec_version >= manifest_mod.LFS_SPEC_VERSION:
             from hills.materialize import materialize_lfs
 
-            commit = self.vc.resolve_commit("HEAD")
-            return materialize_lfs(self, commit, dest)
+            return materialize_lfs(self, commit or self.vc.resolve_commit("HEAD"), dest)
         return self._materialize_legacy_locks(dest)
 
     def _materialize_legacy_locks(self, dest: Path) -> Path:

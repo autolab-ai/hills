@@ -75,21 +75,24 @@ def evaluate(
     submission = Path(submission).resolve()
     if not submission.is_dir():
         raise HillsError(f"submission {submission} is not a directory. A submission is a directory.")
-    params = hill.manifest.resolve_params(param_overrides)
     hill.require_vc()
     hill.refresh_exclude()
 
     run_dir = new_run_dir(hill.name)
-    hill_root, tree_hash, commit, official, official_reason, env_key = _prepare_hill(
+    hill_root, tree_hash, commit, official, official_reason, env_key, eval_manifest = _prepare_hill(
         hill, run_dir, force=force, current=current
     )
+    # Scoring-relevant inputs (params, exclusive device, reported spec) come from the
+    # manifest of the exact version being evaluated -- for an official run that is the
+    # committed manifest at the pinned commit, never the (possibly dirty) working tree.
+    params = eval_manifest.resolve_params(param_overrides)
 
     snapshot = run_dir / "submission"
     snapshot_submission(submission, snapshot)
     submission_hash = hash_tree(snapshot)
     git_label = report_mod.submission_git(submission)
 
-    device = devlock.resolve_device(hill.manifest.exclusive) if hill.manifest.exclusive else None
+    device = devlock.resolve_device(eval_manifest.exclusive) if eval_manifest.exclusive else None
     with devlock.hold(device, queue):
         core, error = _run_evaluator(
             hill, hill_root, run_dir, snapshot, params, final, env_key, stream
@@ -108,7 +111,7 @@ def evaluate(
             final=final,
             official=official,
             official_reason=official_reason,
-            hill_spec_version=hill.manifest.spec_version,
+            hill_spec_version=eval_manifest.spec_version,
             tool_version=_tool_version(),
         )
 
@@ -132,9 +135,16 @@ def _tool_version() -> str:
 
 
 def _prepare_hill(hill: Hill, run_dir: Path, *, force: bool, current: bool):
-    """Decide which version of the hill is being evaluated and lay it out."""
+    """Decide which version of the hill is being evaluated and lay it out.
+
+    Returns (hill_root, tree_hash, commit, official, official_reason, env_key,
+    eval_manifest). For an official run a single commit is pinned and its committed
+    manifest is returned, so tree, materialized bytes, params, device and reported
+    spec all come from one immutable revision.
+    """
     if current:
-        return hill.root, None, None, False, "dirty-tree", uvenv.WORKING_TREE_ENV
+        _verify_current_lfs(hill)  # a spec-4 working tree must have its LFS resolved
+        return hill.root, None, None, False, "dirty-tree", uvenv.WORKING_TREE_ENV, hill.manifest
 
     hill.require_commits()
     dirty = hill.vc.status_porcelain()
@@ -154,9 +164,36 @@ def _prepare_hill(hill: Hill, run_dir: Path, *, force: bool, current: bool):
             file=sys.stderr,
         )
 
-    materialized = hill.materialize(run_dir / "hill")
-    tree_hash = hill.vc.tree_hash()
-    return materialized, tree_hash, hill.vc.commit_hash(), True, None, tree_hash
+    from hills import manifest as manifest_mod
+
+    commit = hill.vc.resolve_commit("HEAD")  # pin ONE revision for the whole run
+    tree_hash = hill.vc.tree_of(commit)
+    eval_manifest = manifest_mod.loads(
+        hill.vc.show(f"{commit}:hill.yaml"), f"{hill.name}@{commit[:12]} hill.yaml"
+    )
+    materialized = hill.materialize(run_dir / "hill", commit=commit)
+    return materialized, tree_hash, commit, True, None, tree_hash, eval_manifest
+
+
+def _verify_current_lfs(hill: Hill) -> None:
+    """For an unofficial --current run of a spec-4 hill, fail if a filter=lfs working
+    file is still an unresolved pointer, so a mis-provisioned checkout does not score
+    against pointer text. Uses the working tree's attributes and files."""
+    if not hill.is_lfs() or not hill.vc.has_commits:
+        return
+    from hills import lfs
+
+    tracked = hill.vc.ls_tree("HEAD")
+    filters = hill.vc.working_attr_filter(tracked)
+    for path in tracked:
+        if filters.get(path) != "lfs":
+            continue
+        f = hill.root / path
+        if f.is_file() and lfs.looks_like_pointer(f.read_bytes()[: lfs.MAX_POINTER_BYTES]):
+            raise HillsError(
+                f"{path}: still an unresolved git-LFS pointer in the working tree; "
+                "run `git lfs pull` before evaluating"
+            )
 
 
 def _host_python() -> str:
