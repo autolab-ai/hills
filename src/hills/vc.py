@@ -70,6 +70,20 @@ class VC:
     def out(self, *args: str) -> str:
         return self.run(*args).stdout.strip()
 
+    def _base_hermetic(self) -> list[str]:
+        """git base that ignores attribute files OUTSIDE the committed tree (the global
+        core.attributesFile and $GIT_DIR/info/attributes), so LFS classification depends
+        only on the hill's own .gitattributes and is identical on author and node."""
+        base = self._base()
+        return [base[0], "-c", "core.attributesFile=/dev/null", *base[1:]]
+
+    @staticmethod
+    def _hermetic_env() -> dict[str, str]:
+        """Env that skips the system /etc/gitattributes for attribute lookups."""
+        import os
+
+        return {**os.environ, "GIT_ATTR_NOSYSTEM": "1"}
+
     # -- lifecycle --------------------------------------------------------
 
     @property
@@ -242,10 +256,11 @@ class VC:
             return {}
         stdin = ("\0".join(paths) + "\0").encode()
         result = subprocess.run(
-            self._base() + ["check-attr", "--source", commit, "-z", "filter", "--stdin"],
+            self._base_hermetic() + ["check-attr", "--source", commit, "-z", "filter", "--stdin"],
             cwd=self.root,
             input=stdin,
             capture_output=True,
+            env=self._hermetic_env(),
         )
         if result.returncode != 0:
             raise HillsError(
@@ -285,10 +300,11 @@ class VC:
             return {}
         stdin = ("\0".join(paths) + "\0").encode()
         result = subprocess.run(
-            self._base() + ["check-attr", "-z", "filter", "--stdin"],
+            self._base_hermetic() + ["check-attr", "-z", "filter", "--stdin"],
             cwd=self.root,
             input=stdin,
             capture_output=True,
+            env=self._hermetic_env(),
         )
         if result.returncode != 0:
             raise HillsError("git check-attr failed:\n" + result.stderr.decode("utf-8", "replace"))
