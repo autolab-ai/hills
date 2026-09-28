@@ -35,3 +35,8 @@ class DeviceBusy(HillsError):
 
 class BundleError(HillsError):
     """A bundle file is malformed, unsafe, or does not verify against its manifest."""
+
+
+class LfsError(HillsError):
+    """A git-LFS pointer is malformed/unsupported, or an evaluator-visible LFS file
+    does not match its committed pointer (oid/size mismatch, e.g. unresolved pull)."""
