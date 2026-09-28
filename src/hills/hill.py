@@ -134,6 +134,8 @@ class Hill:
 
     def lock_drift(self) -> list[str]:
         """Lock-tracked content that changed without a commit. Git cannot see this."""
+        if self.is_lfs():
+            return []  # spec-4 has no locks; git (incl. LFS pointers) sees everything
         if not self.vc.has_commits:
             return []
         head_private, head_blobs = self.head_locks()
