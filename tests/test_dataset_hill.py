@@ -24,7 +24,13 @@ def _make_dataset_hill(tmp_path: Path, monkeypatch) -> Hill:
     return scaffold.new("dataspec", template="dataset")
 
 
-def test_dataset_hill_commits_pointers_and_materializes(tmp_path, monkeypatch):
+def test_dataset_hill_scaffolds_and_commits_pointers(tmp_path, monkeypatch):
+    """The real authoring flow: `hills new --template dataset` makes a modern .git repo,
+    and committing stores every filter=lfs file as a canonical pointer (not raw bytes).
+
+    Materialization from a provisioned (smudged) checkout is covered deterministically
+    by test_materialize_lfs.py; this test deliberately does not depend on git-lfs's
+    post-commit working-tree state, which varies by git-lfs version/config."""
     hill = _make_dataset_hill(tmp_path, monkeypatch)
     assert hill.is_lfs()
     assert (hill.root / ".git").is_dir() and not (hill.root / ".vc").exists()
@@ -38,24 +44,16 @@ def test_dataset_hill_commits_pointers_and_materializes(tmp_path, monkeypatch):
     hill.vc.run("add", "-A")
     objects = hill.verify_staged_lfs_pointers()
     assert {p for p, _ in objects} >= {"data/big.json", "data/dataset.json"}
-    hill.vc.commit("initial", [])
+    hill.vc.commit_staged("initial")
 
-    # A provisioned checkout has the LFS bytes smudged into the working tree (what a
-    # node gets from `git lfs pull`). Some git-lfs setups leave pointers in the tree
-    # after `git add`, so smudge explicitly before materializing, exactly as a node does.
-    subprocess.run(["git", "-C", str(hill.root), "lfs", "checkout"], check=True, capture_output=True)
-
-    # The committed blob is a POINTER, not the raw bytes.
-    committed = hill.vc.blob_bytes(hill.vc.out("rev-parse", "HEAD:data/big.json"))
-    assert committed.startswith(b"version https://git-lfs.github.com/spec/v1")
-
-    # Materialize lays out the REAL bytes (verified), not the pointer.
-    dest = tmp_path / "run"
-    hill.materialize(dest)
-    out = dest / "data" / "big.json"
-    assert out.is_file() and not out.is_symlink()
-    assert json.loads(out.read_text())["rows"][1999] == [1999, 3998]
-    assert (dest / "eval.py").is_file()
+    # Every committed filter=lfs blob is a canonical LFS pointer, not the raw bytes.
+    for path in ("data/big.json", "data/dataset.json"):
+        blob = hill.vc.blob_bytes(hill.vc.out("rev-parse", f"HEAD:{path}"))
+        assert blob.startswith(b"version https://git-lfs.github.com/spec/v1"), path
+    # eval.py is a normal (non-LFS) file, committed as its real bytes.
+    assert not hill.vc.blob_bytes(hill.vc.out("rev-parse", "HEAD:eval.py")).startswith(
+        b"version https://git-lfs.github.com/spec/v1"
+    )
 
 
 def test_bundle_refused_on_spec4(tmp_path, monkeypatch):
