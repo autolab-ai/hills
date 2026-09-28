@@ -5,6 +5,7 @@ project repo it lives inside. Users and agents never run git against a hill.
 import subprocess
 import tarfile
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 
 from hills.errors import HillsError
@@ -24,15 +25,34 @@ def escape_pattern(path: str) -> str:
     return "".join("\\" + ch if ch in "*?[]\\!# " else ch for ch in path)
 
 
+@dataclass(frozen=True)
+class TreeEntry:
+    mode: str  # e.g. "100644", "100755", "120000" (symlink), "160000" (gitlink)
+    otype: str  # "blob" | "commit" (gitlink)
+    oid: str  # git object id
+    path: str
+
+
 class VC:
     def __init__(self, root: Path):
         self.root = Path(root).resolve()
-        self.git_dir = self.root / GIT_DIR_NAME
+        has_legacy = (self.root / GIT_DIR_NAME).is_dir()
+        has_git = (self.root / ".git").exists()  # dir (normal) or file (linked worktree)
+        if has_legacy and has_git:
+            raise HillsError(
+                f"{self.root} has both {GIT_DIR_NAME} and .git; refusing to guess which "
+                "repository is the hill. Remove one."
+            )
+        # Legacy hills keep git in .vc; modern hills are ordinary git repos (.git).
+        self.legacy = has_legacy and not has_git
+        self.git_dir = self.root / (GIT_DIR_NAME if self.legacy else ".git")
 
     # -- plumbing ---------------------------------------------------------
 
     def _base(self) -> list[str]:
-        return ["git", f"--git-dir={self.git_dir}", f"--work-tree={self.root}"]
+        if self.legacy:
+            return ["git", f"--git-dir={self.git_dir}", f"--work-tree={self.root}"]
+        return ["git", "-C", str(self.root)]
 
     def run(self, *args: str, check: bool = True) -> subprocess.CompletedProcess:
         result = subprocess.run(
@@ -54,21 +74,41 @@ class VC:
 
     @property
     def initialized(self) -> bool:
-        return self.git_dir.is_dir()
+        return (self.root / GIT_DIR_NAME).is_dir() or (self.root / ".git").exists()
 
     def init(self) -> None:
+        """Initialize a hill's version control (legacy .vc layout).
+
+        A hill is addressed only through the tool, so its git dir lives in .vc and
+        never collides with a surrounding project repo. Modern spec-4 (git-LFS) hills
+        that are cloned by a node arrive as ordinary .git repos, which VC discovers
+        automatically; :meth:`init_modern` creates that layout when authoring one.
+        """
         subprocess.run(
-            ["git", "init", "--quiet", f"--separate-git-dir={self.git_dir}", str(self.root)],
+            ["git", "init", "--quiet", f"--separate-git-dir={self.root / GIT_DIR_NAME}", str(self.root)],
             capture_output=True,
             text=True,
             check=True,
         )
-        # `git init --separate-git-dir` leaves a .git file pointing at .vc.
-        # A hill is addressed only through the tool, so drop the pointer and
-        # keep .vc as the sole entry point.
         pointer = self.root / ".git"
         if pointer.exists():
             pointer.unlink()
+        self.legacy = True
+        self.git_dir = self.root / GIT_DIR_NAME
+        self.run("config", "core.excludesFile", "")
+        self.run("config", "commit.gpgsign", "false")
+
+    def init_modern(self) -> None:
+        """Initialize a MODERN hill as an ordinary git repo (.git), so `git clone`,
+        `git lfs`, and everyday git work against it normally (spec-4 LFS hills)."""
+        subprocess.run(
+            ["git", "init", "--quiet", str(self.root)],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        self.legacy = False
+        self.git_dir = self.root / ".git"
         self.run("config", "core.excludesFile", "")
         self.run("config", "commit.gpgsign", "false")
 
@@ -160,8 +200,69 @@ class VC:
         self.run("fetch", "--quiet", str(bundle), "HEAD")
         self.run("reset", "--quiet", "--hard", "FETCH_HEAD")
 
+    # -- pinned-revision raw export (0.12 authoritative materialization) ----
+
+    def resolve_commit(self, rev: str = "HEAD") -> str:
+        return self.out("rev-parse", "--verify", f"{rev}^{{commit}}")
+
+    def tree_of(self, commit: str) -> str:
+        return self.out("rev-parse", "--verify", f"{commit}^{{tree}}")
+
+    def run_bytes(self, *args: str) -> bytes:
+        """Run git capturing raw stdout bytes (for blob content)."""
+        result = subprocess.run(self._base() + list(args), cwd=self.root, capture_output=True)
+        if result.returncode != 0:
+            raise HillsError(
+                f"git {' '.join(args)} failed in {self.root}:\n"
+                f"{result.stderr.decode('utf-8', 'replace').strip()}"
+            )
+        return result.stdout
+
+    def tree_entries(self, commit: str) -> list[TreeEntry]:
+        """Every path in the committed tree, recursively, with mode/type/oid."""
+        raw = self.run_bytes("ls-tree", "-r", "-z", commit)
+        entries: list[TreeEntry] = []
+        for record in raw.split(b"\x00"):
+            if not record:
+                continue
+            meta, _, path = record.partition(b"\t")
+            mode, otype, oid = meta.decode().split()
+            entries.append(TreeEntry(mode=mode, otype=otype, oid=oid, path=path.decode("utf-8")))
+        return entries
+
+    def blob_bytes(self, oid: str) -> bytes:
+        """Raw bytes of a blob object (the committed content; a POINTER for LFS)."""
+        return self.run_bytes("cat-file", "blob", oid)
+
+    def attr_filter(self, commit: str, paths: list[str]) -> dict[str, str]:
+        """The committed ``filter`` gitattribute per path (e.g. "lfs"), read from the
+        tree at ``commit`` (not the working tree/index), so classification matches the
+        exact version being scored. Absent -> "" (git reports "unspecified")."""
+        if not paths:
+            return {}
+        stdin = ("\0".join(paths) + "\0").encode()
+        result = subprocess.run(
+            self._base() + ["check-attr", "--source", commit, "-z", "filter", "--stdin"],
+            cwd=self.root,
+            input=stdin,
+            capture_output=True,
+        )
+        if result.returncode != 0:
+            raise HillsError(
+                "git check-attr --source failed (needs git >= 2.40):\n"
+                + result.stderr.decode("utf-8", "replace").strip()
+            )
+        fields = result.stdout.split(b"\x00")
+        out: dict[str, str] = {}
+        # Output repeats: <path>\0 filter \0 <value>\0
+        for i in range(0, len(fields) - 2, 3):
+            path = fields[i].decode("utf-8")
+            value = fields[i + 2].decode("utf-8")
+            out[path] = "" if value in ("unspecified", "unset") else value
+        return out
+
     def archive_to(self, dest: Path) -> None:
-        """Extract the committed tree at HEAD into dest."""
+        """Extract the committed tree at HEAD into dest (LEGACY only)."""
         dest.mkdir(parents=True, exist_ok=True)
         with tempfile.NamedTemporaryFile(suffix=".tar", delete=False) as handle:
             archive = Path(handle.name)
