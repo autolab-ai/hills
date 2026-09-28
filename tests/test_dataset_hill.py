@@ -40,6 +40,11 @@ def test_dataset_hill_commits_pointers_and_materializes(tmp_path, monkeypatch):
     assert {p for p, _ in objects} >= {"data/big.json", "data/dataset.json"}
     hill.vc.commit("initial", [])
 
+    # A provisioned checkout has the LFS bytes smudged into the working tree (what a
+    # node gets from `git lfs pull`). Some git-lfs setups leave pointers in the tree
+    # after `git add`, so smudge explicitly before materializing, exactly as a node does.
+    subprocess.run(["git", "-C", str(hill.root), "lfs", "checkout"], check=True, capture_output=True)
+
     # The committed blob is a POINTER, not the raw bytes.
     committed = hill.vc.blob_bytes(hill.vc.out("rev-parse", "HEAD:data/big.json"))
     assert committed.startswith(b"version https://git-lfs.github.com/spec/v1")
