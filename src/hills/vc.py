@@ -281,17 +281,39 @@ class VC:
         exact version being scored. Absent -> "" (git reports "unspecified")."""
         if not paths:
             return {}
-        stdin = ("\0".join(paths) + "\0").encode()
-        result = subprocess.run(
-            self._base_hermetic() + ["check-attr", "--source", commit, "-z", "filter", "--stdin"],
-            cwd=self.root,
-            input=stdin,
-            capture_output=True,
-            env=self._hermetic_env(),
-        )
+        import os
+        import shutil
+        import tempfile
+
+        # Read the commit's .gitattributes from a throwaway index (read-tree) and
+        # `check-attr --cached` — both work on any git — instead of `--source`, which
+        # needs git >= 2.40 and so failed on nodes with older git.
+        tmpdir = tempfile.mkdtemp(prefix="hill-attr-")
+        try:
+            env = {**self._hermetic_env(), "GIT_INDEX_FILE": os.path.join(tmpdir, "index")}
+            read = subprocess.run(
+                self._base_hermetic() + ["read-tree", commit],
+                cwd=self.root,
+                capture_output=True,
+                env=env,
+            )
+            if read.returncode != 0:
+                raise HillsError(
+                    "git read-tree failed:\n" + read.stderr.decode("utf-8", "replace").strip()
+                )
+            stdin = ("\0".join(paths) + "\0").encode()
+            result = subprocess.run(
+                self._base_hermetic() + ["check-attr", "--cached", "-z", "filter", "--stdin"],
+                cwd=self.root,
+                input=stdin,
+                capture_output=True,
+                env=env,
+            )
+        finally:
+            shutil.rmtree(tmpdir, ignore_errors=True)
         if result.returncode != 0:
             raise HillsError(
-                "git check-attr --source failed (needs git >= 2.40):\n"
+                "git check-attr --cached failed:\n"
                 + result.stderr.decode("utf-8", "replace").strip()
             )
         fields = result.stdout.split(b"\x00")
